@@ -1,6 +1,8 @@
 # Agentic B2B Integration Engine — Build Plan
 
-*Version 1.0 · October 2026*
+*Version 1.1 · October 2026*
+
+> **v1.1 changes** (details in [design revisions](agentic-integration-engine-design-revisions.md)): hub-and-spoke go-to-market with an embeddable Connect SDK (R1), cross-party State Ledger & Reconciler (R2), Connectivity Ladder with a Discovery Orchestrator (R3), Scenario 3 re-scoped to human-as-API and micro-apps (R4), fintech chosen as the first hub (R5).
 
 ---
 
@@ -12,10 +14,13 @@ We are building a **neutral, two-sided integration platform** that connects two 
 |---|---|---|
 | **S1** | Both have APIs | Ingest specs/docs → map A↔B → generate, test, run integration |
 | **S2** | One/both have a system but no API | Generate an API from DB, codebase, or UI → then S1 |
-| **S3** | One/both have no system | Build a minimal system from templates → then S1 |
+| **S3** | One/both have no system | Human-as-API (forms, email, WhatsApp) or a generated micro-app → then S1 |
 | **All** | Weak infrastructure | Host and operate a durable runtime (retries, queues, monitoring, security) |
+| **All** | Silent drift between parties | Track every shared object in a State Ledger and continuously reconcile both sides |
 
-**Strategy:** use permissive open source for the plumbing (workflows, queues, gateway, observability, secrets). Build natively the five things that are the product: the **Capability Model**, the **Integration Spec**, the **mapping agent**, the **codebase→API agent**, and the **two-sided control plane**.
+**Strategy:** use permissive open source for the plumbing (workflows, queues, gateway, observability, secrets). Build natively the things that are the product: the **Capability Model**, the **Integration Spec**, the **mapping agent**, the **codebase→API agent**, the **Discovery Orchestrator**, the **State Ledger & Reconciler**, the **Connect SDK**, and the **two-sided control plane**.
+
+**Go-to-market:** sell to a **hub** (first: fintechs in Egypt/KSA) that embeds our Connect SDK and brings its many **spokes** (merchants, suppliers) onto the network.
 
 **Rule of thumb:** if a customer would never notice us swapping a component, use open source. If it's the reason they pay us, build it.
 
@@ -23,7 +28,7 @@ We are building a **neutral, two-sided integration platform** that connects two 
 
 ## 1. Core concepts (the heart of the design)
 
-Everything in the platform revolves around four objects. Getting these right is what makes integration #10 much cheaper than integration #1.
+Everything in the platform revolves around five objects. Getting these right is what makes integration #10 much cheaper than integration #1.
 
 ### 1.1 Capability Model (CM)
 A normalized, machine-readable description of **what a company's system can do**, independent of how we learned it.
@@ -71,10 +76,19 @@ reliability:
 sla:
   max_latency: 2m
   alert_channels: [email:ops@acme.com, email:it@nile.com]
+reconciliation:            # v1.1 — see §1.5
+  entity: canonical.SalesOrder
+  match_on: [external_ids.nile, external_ids.acme]
+  track_fields: [status, total_amount, line_items[*].quantity]
+  schedule: "*/30 * * * *"
+  auto_heal: [missing_at_target, state_mismatch]
 ```
 
 ### 1.4 Connection
-A tenant-scoped, credential-bearing link to one company's system (API keys, OAuth, DB credentials, or an **Edge Agent** running in their network).
+A tenant-scoped, credential-bearing link to one company's system (API keys, OAuth, DB credentials, or an **Edge Agent** running in their network). Since v1.1 a connection is chosen **per entity** from the Connectivity Ladder (§3.13) and can be upgraded later without changing the Integration Spec.
+
+### 1.5 Cross-party State (v1.1)
+Every business object that crosses between parties has a record in the **State Ledger**: canonical key, state machine, each party's last observed view, and append-only transitions. The **Reconciler** compares both sides against it and raises **breaks** (`missing_at_target`, `state_mismatch`, `value_mismatch`, `orphan_money`, `stale`…). This turns the promise from "we move your data" into "we guarantee both sides agree". Details in §3.14.
 
 ---
 
@@ -129,14 +143,24 @@ flowchart TB
     C2[Approvals & audit]
     C3[Dashboards & alerts]
     C4[Billing]
+    C5[Connect SDK - embedded in hub apps]
+  end
+
+  DO[Discovery Orchestrator - ladder - BUILD]
+  subgraph Agree["8. State & Reconciliation (BUILD + Formance ledger)"]
+    L1[State Ledger]
+    L2[Reconciler]
+    L3[Money ledger]
   end
 
   OBS[7. Observability - OSS]
 
-  Sources --> Ingest --> CM
+  Sources --> DO --> Ingest --> CM
   CM <--> CDM
   CM --> Design --> Verify --> Runtime
   Runtime --> OBS --> Control
+  Runtime <--> Agree
+  Agree --> Control
   Control --> Design
 ```
 
@@ -196,11 +220,11 @@ Proposes how A's entities/fields map to B's (or to canonical).
 
 Generated APIs are **deployed as part of the Edge Agent** (see §3.9) or in our cloud, always with an OpenAPI spec that goes back into the CM.
 
-### 3.7 System builder — Scenario 3 🔴 (later phase)
-- Vertical templates (e.g. "minimal order management", "minimal inventory", "minimal invoicing")
-- Built on a backend framework + admin UI generator
-- **OSS candidates:** **Directus** (BSL — check terms), **NocoDB** (check terms), or our own template on **NestJS / FastAPI + Postgres + React-Admin (MIT)**
-- Recommendation: own templates on permissive stack to avoid license traps
+### 3.7 Scenario 3 — no system 🔴 (re-scoped in v1.1)
+Scenario 3 is no longer a separate "build a system" project. It is the bottom of the Connectivity Ladder:
+- **T8a — Human-as-API (Phase 2):** the engine sends tasks (form link, email, WhatsApp) when the spec needs input; an agent parses replies into canonical events with confidence scores. To the Integration Spec it is just a slow connection.
+- **T8b — Generated micro-app (Phase 4, optional):** a small app over the canonical entities a counterparty handles (tables, forms, status, export), following the Appsmith / ToolJet / NocoBase pattern. Its API is T1 by construction.
+- **OSS candidates:** **Appsmith** (Apache 2.0) as reference or base, or our own generator on **React-Admin / Refine (MIT)**. Avoid BSL/AGPL bases if hosted (see Appendix B).
 
 ### 3.8 Verification 🟡
 
@@ -271,6 +295,36 @@ Reliability patterns enforced by the runtime by default:
 
 > ⚠️ **License check before adopting anything.** Licenses change (Redis, Terraform, Vault, Elastic all did). Avoid building the core on ELv2, BSL, SSPL or "Sustainable Use" licenses (e.g. Nango, n8n, Airbyte platform) if we host it for customers. Prefer MIT / Apache 2.0 / BSD / MPL. Verify every license at adoption time.
 
+### 3.13 Discovery Orchestrator & Connectivity Ladder 🔴 (v1.1)
+Walks the ladder **per entity** and records the chosen tier in the CM:
+
+| Tier | Method |
+|---|---|
+| T1 | Official API / webhooks |
+| T2 | Docs / Postman → generated client |
+| T3 | Database via Edge Agent (+ CDC) |
+| T4 | Codebase → generated API |
+| T5 | UI traffic → internal API (consented) |
+| T6 | Shared external sources (e-invoicing portals ETA/ZATCA, marketplaces, open-banking statements, customs) |
+| T7 | Documents (email inbox, Excel, PDF) |
+| T8 | Human-as-API / micro-app (§3.7) |
+
+- Same CM output from every tier → same Integration Spec
+- Re-runs discovery on schedule or on request; upgrades a connection when a higher tier appears, then the Reconciler confirms nothing changed
+- Tier, reliability and latency are shown to the hub and reflected in SLAs
+
+### 3.14 State Ledger & Reconciler 🟡 (v1.1)
+- **State Ledger** (🔴): append-only Postgres tables per tenant; every cross-party object, its state machine, each party's observed view, and transitions with run id + payload hash
+- **Money ledger** (🟢): double-entry postings for value movements via **Formance Ledger** (open source — verify license)
+- **Reconciler** (🔴): scheduled Temporal workflow per integration; pulls both sides, compares, emits breaks; auto-heals only `missing_at_target` and `state_mismatch`, never value fields
+- **Ops Agent** consumes breaks and proposes spec/mapping fixes
+- **Product surface:** agreement score, shared breaks inbox, signed proof-of-agreement export
+
+### 3.15 Connect SDK 🔴 (v1.1)
+- Embeddable `connect.js` widget + hosted connect links (email/WhatsApp) for spokes
+- Hub API and webhooks (`connection.ready`, `reconciliation.break`, …)
+- White-label, Arabic/English, revocable consent records per hub and scope
+
 ---
 
 ## 4. The agents in detail
@@ -287,7 +341,9 @@ Reliability patterns enforced by the runtime by default:
 | **Integration Designer** | Business intent + CMs + mappings | Integration Spec YAML | Both parties approve |
 | **API Builder** (S2) | CM from code/DB | Generated API service + OpenAPI + tests | Code review |
 | **Test Author** | Spec + CMs + samples | Contract, fuzz, golden tests | Auto (must pass) |
-| **Ops Agent** | Failures, drift alerts | Diagnosis + proposed fix (PR to spec) | Approve fix |
+| **Ops Agent** | Failures, drift alerts, reconciliation breaks | Diagnosis + proposed fix (PR to spec) | Approve fix |
+| **Discovery Orchestrator** (v1.1) | Company onboarding inputs | Chosen ladder tier per entity | Confirm tier for low-reliability entities |
+| **Document / Reply Parser** (v1.1) | Emails, Excel, PDF, form & chat replies (T7/T8a) | Canonical events + confidence | Review low-confidence events |
 
 ### 4.2 Guardrails
 - Agents **never** write to customer production directly; they produce artifacts (specs, code, mappings) that go through the verification gate
@@ -352,7 +408,9 @@ Agents must be measured, not trusted.
 | Mapping & canonical models | ~10% | Core IP |
 | Integration Spec & compiler | ~10% | Core IP |
 | Two-sided control plane | ~20% | Auth & UI scaffolding OSS; product logic ours |
-| System builder (S3) | ~40% | Frameworks OSS; templates ours |
+| System builder (S3) → micro-apps | ~40% | Frameworks OSS; generator ours |
+| State Ledger & Reconciler | ~30% | Formance ledger for money; state ledger & reconciler ours |
+| Discovery Orchestrator & Connect SDK | ~10% | Core IP |
 
 **Overall:** roughly **50–60% of the codebase volume comes from open source**, but **~90% of the differentiation is in what we build**.
 
@@ -363,9 +421,9 @@ Agents must be measured, not trusted.
 Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 
 ### Phase 0 — Foundations & vertical choice (Weeks 0–4)
-- Pick **one vertical** and 2–3 design-partner company pairs
+- First hub vertical: **fintech / embedded finance (Egypt or KSA)**; sign 1–2 hub design partners with 10–20 spokes each
 - Draft canonical domain model v0 for that vertical
-- Define Capability Model schema and Integration Spec v0
+- Define Capability Model schema, Integration Spec v0, and State Ledger schema
 - Stand up infra skeleton: Kubernetes, Postgres, Temporal, Keycloak, OpenBao, OTel stack
 - **Exit criteria:** design partners signed; CM + IS schemas reviewed
 
@@ -377,7 +435,10 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 - Verification: Prism mocks + Schemathesis + golden tests
 - Runtime: retries, DLQ, replay, idempotency, alerts
 - Control plane v1: two parties, approvals, run history
-- **Exit criteria:** 3 real integrations live in production; ≥60% of fields auto-mapped; ≥99.5% run success
+- **Connect SDK v1** embedded in the hub's onboarding
+- **Reconciler v1**: missing/state breaks, shared breaks inbox (no auto-heal on values)
+- One T6 connector (e-invoicing portal of the launch country)
+- **Exit criteria:** 1 hub live with ≥20 spokes across ≥3 ladder tiers; ≥60% of fields auto-mapped; ≥99.5% run success; ≥99% agreement score; median spoke onboarding < 1 day
 
 ### Phase 2 — Scenario 2: API generation (Months 5–8)
 - Edge Agent (Go) with outbound tunnel + local buffering
@@ -386,19 +447,22 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 - API Builder agent → generated service + OpenAPI + tests
 - Traffic analyzer as fallback (consented only)
 - Schema-drift detection + Ops Agent proposing fixes
-- **Exit criteria:** 3 integrations live where at least one side had no API
+- **Discovery Orchestrator** walking the full ladder; **T7 documents** and **T8a human-as-API**
+- Formance ledger for money flows
+- **Exit criteria:** 3 integrations live where at least one side had no API, and 1 where one side had no system
 
 ### Phase 3 — Network effect & scale (Months 9–12)
 - Canonical model coverage complete for the vertical
-- "Already on the network" fast path: integrate a new partner to existing members in days
+- "Already on the network" fast path: reuse a spoke's connection for a second hub (with consent) in minutes
+- Agreement score and proof-of-agreement export
 - Self-serve onboarding for companies with good APIs
 - SLA tiers, billing, customer-facing dashboards
 - Security hardening: SOC 2 readiness, pen test, data residency options
 - **Exit criteria:** median time-to-live for a network integration < 1 week
 
 ### Phase 4 — Scenario 3 & second vertical (Year 2)
-- System builder templates for the first vertical
-- Expand to a second vertical (new canonical model, reuse everything else)
+- Generated micro-apps (T8b) for counterparties with recurring volume
+- Expand to a second hub vertical, e.g. retail buyer or 3PL (new canonical model, reuse everything else)
 - Marketplace of verified connectors / company profiles
 
 ---
@@ -427,6 +491,8 @@ Integration engineers are critical early: they deliver for design partners **and
 | Agent errors corrupting customer data | Read-only discovery, verification gate, two-party approval, idempotency, dry-run mode, easy rollback |
 | Security & trust (we touch code and data of two companies) | Edge Agent outbound-only, least privilege, per-tenant encryption, audit log, PII masking, option to self-host LLM |
 | License traps | Prefer MIT/Apache/BSD/MPL; legal review of every core dependency; avoid ELv2/BSL/SSPL in hosted core |
+| Two-sided cold start (need both A and B to buy) | Hub-and-spoke: the hub pays and embeds the Connect SDK; spokes join free |
+| Silent data drift between parties | State Ledger + Reconciler + shared breaks inbox |
 | Incumbents (Boomi, MuleSoft, Workato) add similar features | Compete on two-sided neutrality, underserved segment, vertical depth, and network effect, not on features |
 | Upstream API changes | CM diffing, scheduled re-ingestion, contract tests in production, Ops Agent auto-proposes fixes |
 | "Any codebase" scope explosion | Support named stacks only; expand based on demand |
@@ -436,11 +502,13 @@ Integration engineers are critical early: they deliver for design partners **and
 
 ## 11. Key decisions to make now
 
-1. **Which vertical first?** (drives canonical model, design partners, stacks to support)
+1. ~~**Which vertical first?**~~ → **Decided in v1.1:** fintech / embedded finance hubs. Still open: Egypt or KSA first
 2. **Cloud vs. on-prem first?** (affects Edge Agent priority)
 3. **LLM hosting policy** for sensitive customers (API vs. self-hosted models)
 4. **Pricing model:** per integration, per volume, per SLA tier, or hybrid
 5. **Ownership of generated code** (S2/S3): customer owns it vs. licensed from us
+6. **Ledger scope:** Formance for money only, or for all state? (recommended: Formance for money, own Postgres State Ledger for the rest)
+7. **Spoke self-serve view:** free view of their own connections across hubs?
 
 ---
 
@@ -481,6 +549,8 @@ Integration engineers are critical early: they deliver for design partners **and
 | Debezium | Change data capture | Apache 2.0 |
 | gVisor / Firecracker | Sandboxing | Apache 2.0 |
 | Refine / React-Admin | Admin UI | MIT |
+| Formance Ledger | Double-entry money ledger | MIT (verify) |
+| Appsmith | Low-code app builder (T8b reference/base) | Apache 2.0 (verify) |
 
 ## Appendix B — Use as reference only (don't build core on them)
 
@@ -491,3 +561,5 @@ Integration engineers are critical early: they deliver for design partners **and
 | n8n | Sustainable Use License — not for hosted commercial use |
 | Airbyte (platform) | ELv2 — check connector licenses individually |
 | Directus / NocoDB | Check current terms before using in S3 templates |
+| ToolJet / NocoBase | AGPL — reference for T8b micro-app pattern |
+| Tray Embedded | Closed source — reference for the embedded Connect UX |
