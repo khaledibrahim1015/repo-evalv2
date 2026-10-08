@@ -199,9 +199,9 @@ Tags every CM field with a semantic type instead of writing pairwise mappings.
 
 - Candidate matching: name similarity, embeddings, types, sample values, constraints → predicted semantic type + confidence
 - Low-confidence tags go to human review; confirmed tags become eval data
-- **Resolver:** given a `find` request by semantic type, plans which connections/operations supply each field and joins them. Candidate: **TaxiQL query engine** (Apache 2.0 modules of Orbital) as a JVM service, or our own resolver on Taxi types; decided by a Phase 0 spike
+- **Resolver:** given a `find` request by semantic type, plans which connections/operations supply each field and joins them. **We build it** in TypeScript over a type graph compiled from Taxi: tier-aware cost-based planning, consent filtering, parallel execution as Temporal activities, and per-value lineage (design in design revisions R6). TaxiQL / Orbital are design references only
 - Transformations that are real conversions (unit/currency/date/timezone, enum mapping, splitting/joining) remain in **JSONata** (MIT)
-- **OSS used:** **Taxi** (Apache 2.0) for type definitions; TaxiQL engine (Apache 2.0, spike); JSONata; embeddings via pgvector
+- **OSS used:** **Taxi** (Apache 2.0) for type definitions; JSONata; embeddings via pgvector
 - **Not used:** the Orbital platform itself (BSL 1.1; its license FAQ requires a license for configurable integration offered to end users and for competing services)
 
 ### 3.5 Integration Spec generator & compiler 🔴
@@ -406,7 +406,7 @@ Agents must be measured, not trusted.
 | Doc / code / DB / traffic discovery | ~25% | Parsers are OSS; the agents are ours |
 | API generation (S2) | ~40% | PostgREST/Debezium for DB; code path is ours |
 | Verification | ~60% | Prism, Schemathesis, Pact; we add orchestration & gating |
-| Semantic types & resolver | ~40% | Taxi language + TaxiQL engine (Apache 2.0) if the spike succeeds; type libraries & tagging agent are core IP |
+| Semantic types & resolver | ~10% | Taxi language is OSS; resolver, type libraries & tagging agent are core IP |
 | Integration Spec & compiler | ~10% | Core IP |
 | Two-sided control plane | ~20% | Auth & UI scaffolding OSS; product logic ours |
 | System builder (S3) → micro-apps | ~40% | Frameworks OSS; generator ours |
@@ -425,7 +425,7 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 - First hub vertical: **fintech / embedded finance in Egypt**; sign 1–2 hub design partners with 10–20 spokes each
 - Draft canonical domain model v0 for that vertical
 - Define Capability Model schema, Integration Spec v0, and State Ledger schema
-- Semantic type library v0 (~40 types for embedded finance) + **TaxiQL resolver spike** (1–2 weeks)
+- Semantic type library v0 (~40 types for embedded finance) + **resolver v0 prototype** in TypeScript (2–3 weeks)
 - Region-aware tenancy: data residency, e-invoicing connector, tax fields, currency and language resolved per region
 - Stand up infra skeleton: Kubernetes, Postgres, Temporal, Keycloak, OpenBao, OTel stack
 - **Exit criteria:** design partners signed; CM + IS schemas reviewed
@@ -513,7 +513,7 @@ Integration engineers are critical early: they deliver for design partners **and
 5. **Ownership of generated code** (S2/S3): customer owns it vs. licensed from us
 6. **Ledger scope:** Formance for money only, or for all state? (recommended: Formance for money, own Postgres State Ledger for the rest)
 7. **Spoke self-serve view:** free view of their own connections across hubs?
-8. **Resolver:** embed the TaxiQL engine (JVM service) or build our own on Taxi types? (decided by the Phase 0 spike)
+8. ~~**Resolver:** embed TaxiQL or build our own?~~ → **Decided:** build our own in TypeScript; Taxi stays the type language
 
 ---
 
@@ -557,7 +557,6 @@ Integration engineers are critical early: they deliver for design partners **and
 | Formance Ledger | Double-entry money ledger | MIT (verify) |
 | Appsmith | Low-code app builder (T8b reference/base) | Apache 2.0 (verify) |
 | Taxi | Semantic type language & tooling | Apache 2.0 |
-| TaxiQL query engine (Orbital modules with their own Apache LICENSE) | Semantic resolver (spike) | Apache 2.0 (verify per module) |
 
 ## Appendix B — Use as reference only (don't build core on them)
 
@@ -570,4 +569,5 @@ Integration engineers are critical early: they deliver for design partners **and
 | Directus / NocoDB | Check current terms before using in S3 templates |
 | ToolJet / NocoBase | AGPL — reference for T8b micro-app pattern |
 | Tray Embedded | Closed source — reference for the embedded Connect UX |
+| TaxiQL query engine | Apache 2.0 modules, but we build our own resolver — reference for query planning |
 | Orbital platform | BSL 1.1 (default for modules without their own license); license FAQ requires a license for end-user-configurable integration and competing services — reference for semantic integration UX & architecture |

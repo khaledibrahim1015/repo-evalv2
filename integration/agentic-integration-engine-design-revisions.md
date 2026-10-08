@@ -257,20 +257,64 @@ The Orbital monorepo is multi-licensed; anything without its own license default
 | Part | License | Decision |
 |---|---|---|
 | **Taxi** language and tooling (taxilang repo) | Apache 2.0 | **Use**: semantic type definitions, parser, OpenAPI `x-taxi-type` convention |
-| **TaxiQL query engine** and its modules (`taxiql-query-engine`, `vyne-core-types`, `vyne-query-api`, `schema-management/*`, `datatype-converters`, …) | Apache 2.0 (per-module LICENSE files) | **Spike** as the read resolver; verify every transitive dependency |
+| **TaxiQL query engine** and its modules (`taxiql-query-engine`, `vyne-core-types`, `vyne-query-api`, `schema-management/*`, `datatype-converters`, …) | Apache 2.0 (per-module LICENSE files) | **Reference only** for planner design (we build our own resolver, see below) |
 | **Orbital platform** (UI, connectors, pipelines, auth, …) | BSL 1.1 | **Reference only**: UX, schema publishing, architecture |
 
 ### Limits to keep in mind
-- **Stack:** Orbital/TaxiQL is Kotlin on the JVM; our plan is TypeScript + Python. If adopted, the resolver runs as a separate service behind an internal API.
+- **Stack:** Orbital/TaxiQL is Kotlin on the JVM; our plan is TypeScript + Python. This is one reason we build our own resolver.
 - **Reads vs. writes:** Orbital shines at read-time federation (find, join, enrich). Writes, durable flows and reconciliation stay on Temporal + State Ledger. Semantic tags still help there: write targets are addressed by type too.
 - **Vendor continuity:** small company; we only depend on the Apache-licensed parts, so we can fork if needed.
 
-### Spike (Phase 0, 1–2 weeks)
+### Decision: we build our own resolver (decided)
+We keep **Taxi** as the type language and build the resolver ourselves in TypeScript. The TaxiQL engine and the Orbital platform become design references only.
+
+**Why**
+- **One stack.** No JVM service to run, secure and upgrade next to a TypeScript/Python platform.
+- **Writes and reconciliation.** The resolver must plan writes, feed the State Ledger and respect ladder tiers; TaxiQL is built for read-time federation.
+- **Tier-aware planning is our IP.** Choosing between a T1 API and a T7 Excel source for the same type, with reliability, latency and consent, is product logic, not something to delegate.
+- **No license edge cases.** No need to audit Orbital's transitive dependencies module by module.
+- **Scope is small.** We need a planner over a typed graph, not a general query language.
+
+### Resolver design v0
+
+**Inputs**
+1. **Type registry**: semantic types, inheritance and composite models, compiled from the Taxi type library at build time into JSON. Taxi stays the authoring format; whether we use the Taxi CLI to emit it or a parser for the subset we use (`type X inherits Y`, `model M { ... }`) is a Phase 0 detail.
+2. **Capability Models** of the parties in scope: each operation becomes an edge with input types, output types, tier, expected latency, rate limits and the consent scope it needs.
+3. **Request**: `find <Model|Type> where {Type: value} as [Type, ...]` (read) or `write <Model> with {...}` (write).
+
+**Type graph**
+```
+ nodes  = semantic types
+ edges  = operations   (input types ──op@connection──▶ output types)
+        + model fields (Model ──has──▶ Type)
+        + conversions  (Type ──JSONata fn──▶ Type, e.g. currency, units)
+```
+
+**Planner**
+1. Start from the types already known (the `where` values).
+2. For each requested type, search for a path to it over operation and conversion edges (multi-hop allowed: `MerchantId → TaxRegistrationNumber` from the spoke DB, then `TaxRegistrationNumber → Invoice[]` from ETA).
+3. Edge cost = tier weight (T1 cheapest, T8 most expensive) + expected latency + rate-limit pressure; edges outside the hub's consent scope are removed.
+4. Merge paths into one DAG, batch calls that share inputs, and run independent branches in parallel.
+5. If two sources supply the same type, use the cheaper one and optionally fetch both to emit a `value_mismatch` break to the Reconciler.
+6. If a type is unreachable, return a typed error naming the missing capability. The Discovery Orchestrator can then try to find it (e.g. ask for a document, T7, or a human, T8).
+
+**Executor**
+- Runs the plan through the connection adapters; inside an Integration Spec the steps run as Temporal activities, so retries and timeouts come from the runtime.
+- Caches by `(connection, operation, inputs)` with a TTL per tier.
+- Returns every value with **lineage**: source connection, operation, tier, confidence, timestamp. Lineage is written to the State Ledger and shown in the UI ("where did this number come from?").
+
+**Writes**
+- `write` picks the target operation whose input types cover the payload, applies conversions, and adds the idempotency key from the spec. Writes are never multi-target in v0.
+
+**Out of scope for v0**
+Streaming/subscription queries, arbitrary query language, nested aggregations, cross-tenant joins.
+
+### Phase 0 prototype (2–3 weeks, replaces the TaxiQL spike)
 1. Define ~40 semantic types for embedded finance (merchant profile, sales, invoices, payments, bank lines).
 2. Tag two real spoke sources (one Odoo API, one SQL DB) and the ETA e-invoice schema.
-3. Run TaxiQL queries that join them; measure correctness and latency.
-4. Measure tagging-agent accuracy on the same fields.
-5. **Decide:** embed TaxiQL engine, or keep Taxi as the type language and build a lighter resolver ourselves.
+3. Build resolver v0 (registry, graph, planner, executor with lineage) in TypeScript.
+4. Run 10 realistic hub queries (e.g. "merchant profile + last 6 months of sales + issued e-invoices"); target 100% correct results and p95 < 2 s on T1/T3 sources.
+5. Measure tagging-agent accuracy on the same fields.
 
 ---
 
@@ -278,7 +322,7 @@ The Orbital monorepo is multi-licensed; anything without its own license default
 
 | Phase | v1.0 | v1.1 |
 |---|---|---|
-| 0 | Pick vertical, CM + IS schemas, infra | Fintech hub in **Egypt** chosen; region-aware tenancy; 1–2 hub design partners with 10–20 spokes each; semantic type library v0 for embedded finance; State Ledger schema; **TaxiQL spike** (R6) |
+| 0 | Pick vertical, CM + IS schemas, infra | Fintech hub in **Egypt** chosen; region-aware tenancy; 1–2 hub design partners with 10–20 spokes each; semantic type library v0 for embedded finance; State Ledger schema; **resolver v0 prototype** (R6) |
 | 1 (MVP) | S1 integrations, mapping agent, runtime, control plane | mapping agent → **semantic tagging agent**; `find`-by-type steps in the spec; + **Connect SDK v1**, + **Reconciler v1** (missing/state breaks, no auto-heal on values), + T6 connector for **ETA (Egypt)** |
 | 2 | S2: Edge Agent, DB, code, traffic | + **Discovery Orchestrator**, + **T7 documents**, + **T8a human-as-API**, + Formance ledger for money flows |
 | 3 | Network effect & scale | + **KSA launch** (ZATCA connector, in-kingdom deployment), + reuse spoke connections across hubs with consent, agreement score, proof-of-agreement export |
@@ -291,7 +335,7 @@ The Orbital monorepo is multi-licensed; anything without its own license default
 2. Self-hosted ledger (Formance) vs. our own Postgres ledger for non-money state only
 3. Pricing per connected spoke vs. per reconciled object
 4. Whether spokes get a free self-serve view of their own connections (helps the network, costs support)
-5. Embed the TaxiQL engine (JVM service) or build our own resolver on Taxi types (decided by the R6 spike)
+5. ~~Embed TaxiQL or build our own resolver~~ → **Build our own** (TypeScript, Taxi as type language)
 
 ## Sources
 - [Integuru — fintech](https://www.integuru.com/industries/fintech)
