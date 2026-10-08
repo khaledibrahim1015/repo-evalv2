@@ -167,7 +167,7 @@ Result: Scenario 3 stops being bespoke work and becomes the bottom of the ladder
 ## R5 — First hub: fintech / embedded finance
 
 ### Recommendation
-Start with fintechs (lenders, B2B BNPL, payment and collections platforms, invoice financing) in **Egypt and KSA** as the first hubs.
+Start with fintechs (lenders, B2B BNPL, payment and collections platforms, invoice financing) in **Egypt first, then KSA** as the first hubs (see *Launch market* below).
 
 ### Why
 | Factor | Why fintech wins |
@@ -185,22 +185,40 @@ A fintech hub needs many entity types: company profile (KYB), sales orders, cust
 - Central-bank and data-protection rules: consent records, data residency, audit trails (R1 consent + v1.0 security work cover most of it).
 - Money write-back is high risk: two-party approval + dry-run + Reconciler before any production write.
 
+### Launch market: Egypt first, KSA next (decided)
+Technically the choice is small: it changes the T6 connector (ETA vs. ZATCA Fatoora), tax/registration fields in the canonical model, currency and language. Commercially it matters more.
+
+| | Egypt | KSA |
+|---|---|---|
+| Spokes | Very large SMB base | Fewer, larger companies |
+| Systems | Mostly Excel, local software or none → the lower ladder tiers matter most | More cloud ERP → more T1 |
+| Hub budget | Lower; EGP currency risk | Higher; SAR pegged to USD |
+| Sales cycle | Faster | Slower; local entity/presence often expected |
+| Data residency | Lighter | Financial data likely must be hosted in-kingdom |
+| Team cost | Lower | Higher |
+
+*Regulatory points are indicative and must be confirmed with local counsel.*
+
+**Why Egypt first:** it has the hardest cases (no API, no system). If the ladder works there, it works anywhere, and that builds the moat. Design partners and the team are cheaper and faster to get. KSA follows once one Egyptian hub is live with real numbers (agreement score, onboarding time), which shortens KSA sales cycles.
+
+**Requirement from day one:** country is configuration, not code. Tenants carry a region; data residency, e-invoicing connector, tax fields, currency and language are resolved per region, so KSA (in-kingdom hosting included) is a deployment, not a rewrite.
+
 ---
 
 ## Impact on the roadmap
 
 | Phase | v1.0 | v1.1 |
 |---|---|---|
-| 0 | Pick vertical, CM + IS schemas, infra | Fintech hub chosen; 1–2 hub design partners with 10–20 spokes each; canonical model v0 for embedded finance; State Ledger schema |
-| 1 (MVP) | S1 integrations, mapping agent, runtime, control plane | + **Connect SDK v1**, + **Reconciler v1** (missing/state breaks, no auto-heal on values), + T6 connector for one e-invoicing portal |
+| 0 | Pick vertical, CM + IS schemas, infra | Fintech hub in **Egypt** chosen; region-aware tenancy; 1–2 hub design partners with 10–20 spokes each; canonical model v0 for embedded finance; State Ledger schema |
+| 1 (MVP) | S1 integrations, mapping agent, runtime, control plane | + **Connect SDK v1**, + **Reconciler v1** (missing/state breaks, no auto-heal on values), + T6 connector for **ETA (Egypt)** |
 | 2 | S2: Edge Agent, DB, code, traffic | + **Discovery Orchestrator**, + **T7 documents**, + **T8a human-as-API**, + Formance ledger for money flows |
-| 3 | Network effect & scale | + reuse spoke connections across hubs with consent, agreement score, proof-of-agreement export |
+| 3 | Network effect & scale | + **KSA launch** (ZATCA connector, in-kingdom deployment), + reuse spoke connections across hubs with consent, agreement score, proof-of-agreement export |
 | 4 | S3 system builder, second vertical | **T8b micro-apps** (optional), second vertical (retail buyer or 3PL hub) |
 
 **Revised MVP exit criteria:** 1 hub live with ≥20 spokes across ≥3 ladder tiers; ≥99.5% run success; ≥99% agreement score on reconciled entities; median spoke onboarding < 1 day.
 
 ## Remaining open decisions
-1. Egypt first or KSA first (drives which e-invoicing connector ships in the MVP)
+1. ~~Egypt first or KSA first~~ → **Egypt first**, KSA in Phase 3
 2. Self-hosted ledger (Formance) vs. our own Postgres ledger for non-money state only
 3. Pricing per connected spoke vs. per reconciled object
 4. Whether spokes get a free self-serve view of their own connections (helps the network, costs support)

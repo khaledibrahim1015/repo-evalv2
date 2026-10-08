@@ -20,7 +20,7 @@ We are building a **neutral, two-sided integration platform** that connects two 
 
 **Strategy:** use permissive open source for the plumbing (workflows, queues, gateway, observability, secrets). Build natively the things that are the product: the **Capability Model**, the **Integration Spec**, the **mapping agent**, the **codebase→API agent**, the **Discovery Orchestrator**, the **State Ledger & Reconciler**, the **Connect SDK**, and the **two-sided control plane**.
 
-**Go-to-market:** sell to a **hub** (first: fintechs in Egypt/KSA) that embeds our Connect SDK and brings its many **spokes** (merchants, suppliers) onto the network.
+**Go-to-market:** sell to a **hub** (first: fintechs in Egypt, then KSA) that embeds our Connect SDK and brings its many **spokes** (merchants, suppliers) onto the network.
 
 **Rule of thumb:** if a customer would never notice us swapping a component, use open source. If it's the reason they pay us, build it.
 
@@ -421,9 +421,10 @@ Agents must be measured, not trusted.
 Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 
 ### Phase 0 — Foundations & vertical choice (Weeks 0–4)
-- First hub vertical: **fintech / embedded finance (Egypt or KSA)**; sign 1–2 hub design partners with 10–20 spokes each
+- First hub vertical: **fintech / embedded finance in Egypt**; sign 1–2 hub design partners with 10–20 spokes each
 - Draft canonical domain model v0 for that vertical
 - Define Capability Model schema, Integration Spec v0, and State Ledger schema
+- Region-aware tenancy: data residency, e-invoicing connector, tax fields, currency and language resolved per region
 - Stand up infra skeleton: Kubernetes, Postgres, Temporal, Keycloak, OpenBao, OTel stack
 - **Exit criteria:** design partners signed; CM + IS schemas reviewed
 
@@ -437,7 +438,7 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 - Control plane v1: two parties, approvals, run history
 - **Connect SDK v1** embedded in the hub's onboarding
 - **Reconciler v1**: missing/state breaks, shared breaks inbox (no auto-heal on values)
-- One T6 connector (e-invoicing portal of the launch country)
+- One T6 connector: **ETA e-invoicing (Egypt)**
 - **Exit criteria:** 1 hub live with ≥20 spokes across ≥3 ladder tiers; ≥60% of fields auto-mapped; ≥99.5% run success; ≥99% agreement score; median spoke onboarding < 1 day
 
 ### Phase 2 — Scenario 2: API generation (Months 5–8)
@@ -458,6 +459,7 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 - Self-serve onboarding for companies with good APIs
 - SLA tiers, billing, customer-facing dashboards
 - Security hardening: SOC 2 readiness, pen test, data residency options
+- **KSA launch:** ZATCA Fatoora connector, in-kingdom deployment, first Saudi hub
 - **Exit criteria:** median time-to-live for a network integration < 1 week
 
 ### Phase 4 — Scenario 3 & second vertical (Year 2)
@@ -502,7 +504,7 @@ Integration engineers are critical early: they deliver for design partners **and
 
 ## 11. Key decisions to make now
 
-1. ~~**Which vertical first?**~~ → **Decided in v1.1:** fintech / embedded finance hubs. Still open: Egypt or KSA first
+1. ~~**Which vertical first?**~~ → **Decided in v1.1:** fintech / embedded finance hubs, **Egypt first, KSA in Phase 3** (rationale in design revisions R5)
 2. **Cloud vs. on-prem first?** (affects Edge Agent priority)
 3. **LLM hosting policy** for sensitive customers (API vs. self-hosted models)
 4. **Pricing model:** per integration, per volume, per SLA tier, or hybrid
