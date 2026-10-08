@@ -6,11 +6,11 @@
 
 ## 1. Architecture principles
 
-1. **One model in the middle.** Every ladder tier produces the same Capability Model; everything downstream reads only the CM and semantic types.
-2. **Meaning over mapping.** Fields are tagged with semantic types; the Resolver composes sources. Pairwise mappings exist only for true conversions.
+1. **One model in the middle.** Every ladder tier produces the same Capability Model; everything downstream reads only the CM and the canonical model.
+2. **Map once to canonical.** Each connection is mapped once to the vertical's Canonical Data Model. Hubs only ever see canonical entities, so a new hub needs no new mapping for an existing spoke.
 3. **Durable by default.** Every side-effect runs inside a durable workflow with idempotency keys. Nothing important lives only in memory.
 4. **Prove, don't assume.** Every cross-party object is tracked in the State Ledger and reconciled.
-5. **Agents propose, gates decide.** Agents produce artifacts (CMs, tags, specs, fixes); verification and humans approve. Agents never write to customer production directly.
+5. **Agents propose, gates decide.** Agents produce artifacts (CMs, mappings, specs, fixes); verification and humans approve. Agents never write to customer production directly.
 6. **Tenant and region isolation first.** Tenant id and region are on every request, row, event, log line, and key.
 7. **Outbound-only into customer networks.** The Edge Agent dials out; Wasla never needs inbound firewall rules.
 8. **Events as the backbone.** Services communicate through commands (sync API) and domain events (async). Each service owns its data.
@@ -92,11 +92,11 @@ flowchart TB
     EAG[Edge Agent - customer site]
   end
 
-  subgraph Semantics["Semantics"]
+  subgraph Canonical["Canonical data"]
     CMR[Capability Model Registry]
-    STR[Semantic Type Registry]
-    TAG[Tagging Service]
-    RES[Resolver]
+    CDMR[Canonical Model Registry]
+    MAPS[Mapping Service]
+    CDS[Canonical Data Service]
   end
 
   subgraph Integration["Integration"]
@@ -138,18 +138,18 @@ flowchart TB
 
   BUS[(Event Bus)]
 
-  UX --> GW --> Platform & Connectivity & Semantics & Integration & Agreement & Human
+  UX --> GW --> Platform & Connectivity & Canonical & Integration & Agreement & Human
   WH --> BUS
   TG <--> EAG
   CNR --> TG
-  Connectivity & Semantics & Integration & Agreement & Human & AI --> BUS
+  Connectivity & Canonical & Integration & Agreement & Human & AI --> BUS
   ING --> CMR
-  CMR --> TAG --> STR
-  RES --> CNR
-  RES --> CMR & STR
-  ORC --> RES
+  CMR --> MAPS --> CDMR
+  CDS --> CNR
+  CDS --> CMR & CDMR
+  ORC --> CDS
   ORC --> SLS
-  REC --> SLS & RES
+  REC --> SLS & CDS
   REC --> BRK
   OPS --> RUN & BRK & CMR
 ```
@@ -183,10 +183,10 @@ Full specification of each service in [03-services.md](03-services.md).
 | S21 | Country Connectors (T6) | Connectivity | TS | Postgres | 1 (ETA) / 3 (ZATCA) |
 | S22 | Edge Agent | Connectivity | Go | Local SQLite buffer | 1 |
 | S23 | API Generator (S2) | Connectivity | Python + TS | Object store, Git | 2 |
-| S24 | Capability Model Registry | Semantics | TS | Postgres (JSONB) | 1 |
-| S25 | Semantic Type Registry | Semantics | TS | Postgres + Git | 0 |
-| S26 | Tagging Service | Semantics | Python | Postgres + vectors | 1 |
-| S27 | Resolver | Semantics | TS | Redis cache | 0 (prototype) / 1 |
+| S24 | Capability Model Registry | Canonical data | TS | Postgres (JSONB) | 1 |
+| S25 | Canonical Model Registry | Canonical data | TS | Postgres + Git | 0 |
+| S26 | Mapping Service | Canonical data | Python | Postgres + vectors | 1 |
+| S27 | Canonical Data Service (CDS) | Canonical data | TS | Redis cache | 1 |
 | S28 | Integration Spec Service | Integration | TS | Postgres + Git | 1 |
 | S29 | Designer Agent | Integration | Python | — | 2 |
 | S30 | Spec Compiler | Integration | TS | — | 1 |
@@ -235,8 +235,8 @@ erDiagram
   CONNECTION { uuid id string tier string system_kind string status uuid secret_ref }
   CAPABILITY_MODEL }o--|| CONNECTION : describes
   CAPABILITY_MODEL { uuid id int version jsonb document string hash }
-  FIELD_TAG }o--|| CAPABILITY_MODEL : on
-  FIELD_TAG { string field_path string semantic_type float confidence string status }
+  ENTITY_MAPPING }o--|| CAPABILITY_MODEL : on
+  ENTITY_MAPPING { string canonical_entity string source_operation text field_mapping float confidence string status }
   INTEGRATION_SPEC }o--|| HUB_SPOKE_LINK : for
   INTEGRATION_SPEC { uuid id int version text yaml string status }
   RUN }o--|| INTEGRATION_SPEC : executes
@@ -252,12 +252,12 @@ erDiagram
 | Store | Use |
 |---|---|
 | PostgreSQL (per region, HA, PITR) | All transactional data; JSONB for CMs/specs; partitioned tables for runs and ledger |
-| Vector index (pgvector-style column in Postgres) | Field/type embeddings for tagging and search |
+| Vector index (pgvector-style column in Postgres) | Field/entity embeddings for mapping and search |
 | Object storage (S3-compatible, per region) | Raw ingested artifacts (specs, docs, HAR, uploads), run payloads (encrypted), exports |
 | Event log (Kafka-compatible) | Domain events, CDC streams, webhook ingress buffer |
-| Redis-compatible cache | Rate limits, resolver cache, sessions, tunnel routing |
+| Redis-compatible cache | Rate limits, CDS cache, sessions, tunnel routing |
 | Temporal | Durable workflow state for discovery, runs, reconciliation, human tasks |
-| Git (internal) | Type libraries, spec history, generated code |
+| Git (internal) | Canonical models, spec history, generated code |
 
 ### 4.4 Event catalog (topics)
 Naming: `<domain>.<entity>.<event>.v<N>`; key = `tenant_id:<entity_id>`; envelope includes `event_id`, `tenant_id`, `region`, `occurred_at`, `actor`, `trace_id`, `schema_version`.
@@ -266,12 +266,12 @@ Naming: `<domain>.<entity>.<event>.v<N>`; key = `tenant_id:<entity_id>`; envelop
 |---|---|---|
 | `tenant.org.created/updated` | Tenant | IAM, Billing, Audit |
 | `tenant.hubspoke.linked/unlinked` | Tenant | Consent, Connect, Billing |
-| `consent.granted/narrowed/revoked` | Consent | Resolver, Connection, Orchestration, Audit |
+| `consent.granted/narrowed/revoked` | Consent | CDS, Connection, Orchestration, Audit |
 | `connection.created/status_changed/health_changed` | Connection | Discovery, Hub API (webhooks), Notification |
 | `discovery.started/tier_selected/completed/failed` | Discovery | CM Registry, Studio, Notification |
-| `cm.version_published` / `cm.diff_detected` | CM Registry | Tagging, Spec Service, Ops Agent |
-| `tags.proposed/confirmed` | Tagging | CM Registry, Resolver cache, Evaluation |
-| `types.library_published` | Type Registry | Tagging, Resolver |
+| `cm.version_published` / `cm.diff_detected` | CM Registry | Mapping, Spec Service, Ops Agent |
+| `mapping.proposed/confirmed` | Mapping | CDS cache, Evaluation |
+| `cdm.version_published` | Canonical Model Registry | Mapping, CDS, Spec Service |
 | `spec.submitted/approved/activated/paused` | Spec Service | Compiler, Orchestration, Notification |
 | `run.started/step_completed/succeeded/failed/dead_lettered` | Orchestration | Run History, State Ledger, Metering, Ops Agent |
 | `ledger.object_transitioned` | State Ledger | Reconciler, Hub API |
@@ -297,7 +297,7 @@ sequenceDiagram
   participant D as Discovery Orchestrator
   participant I as Ingestion worker
   participant CM as CM Registry
-  participant T as Tagging
+  participant T as Mapping
   participant ST as Studio (review)
   S->>CS: open invite link
   CS->>CO: create consent request (hub, scopes)
@@ -308,7 +308,7 @@ sequenceDiagram
   D->>I: run tier workers per entity (parallel)
   I->>CM: draft CM (provenance, confidence)
   CM-->>T: cm.version_published
-  T->>CM: tags with confidence
+  T->>T: mappings to canonical entities (confidence)
   alt low confidence items
     T-->>ST: review queue
     ST->>T: confirm/correct
@@ -317,49 +317,44 @@ sequenceDiagram
   CX-->>CS: connection.ready (webhook to hub)
 ```
 
-### 5.2 Query by meaning
+### 5.2 Reading canonical data
 ```mermaid
 sequenceDiagram
   participant H as Hub backend
   participant API as Hub Public API
-  participant R as Resolver
+  participant DS as Canonical Data Service
   participant CO as Consent
-  participant ST as Type Registry
-  participant CM as CM Registry
+  participant MP as Mapping Service
   participant CR as Connector Runtime
   participant TG as Tunnel Gateway / Edge Agent
-  H->>API: POST /v1/query (find MerchantProfile ...)
-  API->>R: query(tenant, spoke, request)
-  R->>CO: allowed scopes for (hub, spoke)
-  R->>ST: type graph (cached)
-  R->>CM: operations + tags for spoke connections (cached)
-  R->>R: plan (cost-based, consent-filtered DAG)
-  par branch per source
-    R->>CR: call op on T1 API
-    R->>CR: call op via Edge (T3)
-    CR->>TG: tunnel request
-  end
-  R->>R: join, convert, attach lineage
-  R-->>API: result + lineage + missing capabilities
+  H->>API: GET /v1/spokes/{id}/data/invoices?issued_from=...
+  API->>DS: read(tenant, spoke, Invoice, filters)
+  DS->>CO: allowed? (hub, spoke, Invoice)
+  DS->>MP: active mapping for (spoke, Invoice) (cached)
+  DS->>CR: call mapped source operation (filters translated)
+  CR->>TG: tunnel request (if T3)
+  CR-->>DS: source records
+  DS->>DS: apply mapping, validate against CDM, add source metadata
+  DS-->>API: canonical records + next cursor
   API-->>H: 200
 ```
 
 ### 5.3 Integration run with ledger
 1. Trigger (webhook/schedule/CDC/API) → Orchestration starts workflow `run(spec_version, trigger_payload)`.
-2. Each step is an activity: `find`/`write` via Resolver, `map` via conversion engine, `human` via Human Task Service, `code` via Sandbox.
+2. Each step is an activity: `fetch`/`write` via CDS, `map` via conversion engine, `human` via Human Task Service, `code` via Sandbox.
 3. After each state-changing step, Orchestration calls State Ledger `transition(object_key, from, to, run_id, payload_hash)`; money effects call Money Ledger `post(entries)`.
 4. Failures → retry policy → DLQ → `run.dead_lettered` → Ops Agent + notification.
 5. Run History stores step records (masked) for UI and replay.
 
 ### 5.4 Reconciliation
 1. Scheduled workflow per integration (`recon(spec_id)`), cursor-based over State Ledger objects within lookback.
-2. For each batch: Resolver fetches current views from each party (cached, rate-limited); compares tracked fields with tolerance.
-3. Emits breaks; applies auto-heal policy (replay run / re-sync state) for allowed types.
+2. For each batch: CDS fetches current views from each party (cached, rate-limited); compares tracked fields with tolerance.
+3. Emits breaks; applies auto-heal policy (replay run / re-sync state) for allowed break types.
 4. Updates agreement score; publishes `recon.completed`.
 
 ### 5.5 Drift
 1. Discovery re-runs on schedule or on connector errors (e.g. 4xx schema errors).
-2. CM Registry diffs versions → classifies changes (additive, breaking, semantic).
+2. CM Registry diffs versions → classifies changes (additive, breaking, mapping-affecting).
 3. Breaking → Spec Service pauses affected specs; Ops Agent proposes fix; on approval, specs resume, paused runs replay.
 
 ### 5.6 Human task (T8a)
@@ -395,31 +390,31 @@ sequenceDiagram
 
 ---
 
-## 7. Resolver architecture
+## 7. Canonical model, mapping and Canonical Data Service
 
+### 7.1 Canonical Data Model
+- One CDM per vertical, stored as versioned JSON Schema documents in Git and published to the Canonical Model Registry.
+- Each entity defines: fields (type, format, required, enum), identity keys, validation rules, a state machine (for tracked entities such as Invoice, Payment) and which fields are tracked for reconciliation.
+- Embedded-finance CDM v0: `MerchantProfile`, `Customer`, `SalesSummary`, `Invoice`, `InvoiceLine`, `Payment`, `BankLine`, `PaymentStatus`.
+- Compatibility rules: additive changes only within a major version; breaking changes create a new major version with migration of mappings.
+
+### 7.2 Mapping
+- Unit of mapping = **(connection, canonical entity)**.
+- A mapping contains: the source operation(s) that supply the entity (list/get/write), filter translation (canonical filters → source parameters/SQL), field mapping expressions (expression language, JSONata-compatible syntax), enum maps, unit/currency/date conversions, and confidence per field.
+- **Mapping templates per known system:** Odoo, Zoho, ETA, etc. are mapped once; every spoke on that system reuses the template, and only custom fields need new work.
+- The Mapping Service proposes mappings with the mapping agent; low-confidence fields go to Studio review; confirmed mappings become templates and evaluation data.
+
+### 7.3 Canonical Data Service (CDS)
 | Component | Responsibility |
 |---|---|
-| **Type graph builder** | Combines type registry (types, inheritance, models) + tagged CM operations of in-scope connections + conversion functions into a directed graph. Rebuilt incrementally on `tags.confirmed`, `cm.version_published`, `types.library_published`. |
-| **Consent filter** | Removes edges whose types/connections are outside the hub's consent scopes. |
-| **Planner** | Cost-based search from known types to requested types; multi-hop; merges into a DAG; batches calls sharing inputs; marks unreachable types. Cost = tier weight + expected latency + rate-limit pressure + freshness requirement. |
-| **Executor** | Runs the DAG with parallel branches, timeouts, retries (when called directly) or as workflow activities (inside runs); pagination; streaming of collections. |
-| **Converter** | Built-in conversions (currency with dated FX source, units, dates/time zones, enum maps) + expression language for custom conversions. |
-| **Lineage builder** | Attaches source/operation/tier/confidence/time to every value; summary lineage for collections. |
-| **Cache** | Key `(connection, operation, normalized inputs)`; TTL by tier and data product; invalidated by CDC events. |
-| **Write planner** | Selects target op whose inputs cover payload; dry-run; idempotency keys; never multi-target in v1. |
-| **Explain** | Returns the plan, costs, alternatives and reasons. |
-
-**Query language (WQL v1)** — a JSON form and a text form:
-```
-find MerchantProfile
-where MerchantId = "m_123"
-as {
-  legalName: LegalName
-  taxNo: TaxRegistrationNumber
-  sales6m: SalesTotal[] where Period >= "2026-04"
-  invoices: EInvoice[] where IssueDate >= "2026-04-01"
-}
-```
+| **Source selector** | Picks the connection mapped for the entity (primary from Discovery) and the ordered fallbacks |
+| **Consent check** | Rejects reads/writes outside the hub's consent scopes |
+| **Filter translator** | Converts canonical filters and pagination to the source operation |
+| **Executor** | Calls the Connector Runtime; streams pages; timeouts and retries for direct API calls; runs as workflow activity inside integration runs |
+| **Mapper** | Applies the field mapping and conversions; validates output against the CDM |
+| **Source metadata** | Adds connection, tier, fetched-at and (for T7/T8) confidence to every record |
+| **Cache** | Key `(connection, entity, normalized filters)`; TTL by tier; invalidated by CDC events |
+| **Writer** | Applies reverse mapping, selects target operation, dry-run, idempotency key |
 
 ---
 
@@ -470,7 +465,7 @@ as {
 | `edge` | API Gateway, Webhook Ingress, Tunnel Gateway |
 | `platform` | IAM, Tenant, Consent, KMS, Region, Audit, Notification, Billing, Search |
 | `connectivity` | Connection, Discovery, ingestion workers, Connector Runtime, Country Connectors, API Generator |
-| `semantics` | CM Registry, Type Registry, Tagging, Resolver |
+| `canonical` | CM Registry, Canonical Model Registry, Mapping, CDS |
 | `integration` | Spec Service, Compiler, Orchestration workers, Run History, Verification |
 | `agreement` | State Ledger, Money Ledger, Reconciler, Breaks |
 | `human` | Human Tasks, Micro-app Platform |
@@ -497,14 +492,14 @@ Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (de
 | Back-pressure | Rate limits per connection; queue depth-based throttling |
 | Per-key ordering | Event partitions keyed by object key; workflow per key where required |
 | Timeouts everywhere | Default budgets per call type |
-| Graceful degradation | Resolver returns partial results with missing-capability info |
+| Graceful degradation | CDS falls back to the next mapped connection; clear error when none is available |
 | Chaos testing | Monthly game days in staging (tunnel loss, DB failover, broker loss) |
 
 ---
 
 ## 11. Observability
 
-- **Tracing:** every request/run carries `trace_id`, `tenant_id`, `connection_id`, `run_id`; spans across Resolver → Connector → Edge.
+- **Tracing:** every request/run carries `trace_id`, `tenant_id`, `connection_id`, `run_id`; spans across CDS → Connector → Edge.
 - **Metrics:** RED per service; business metrics (connections by tier/status, runs, breaks, agreement score); SLO burn-rate alerts.
 - **Logs:** structured JSON, PII-masked, tenant-tagged; retention per region policy.
 - **Customer-facing:** run history, connection health, Edge Agent status, breaks, agreement score inside consoles (never raw internal dashboards).
@@ -526,7 +521,7 @@ Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (de
 | Cache | Redis-compatible |
 | Object store | S3-compatible |
 | Infra | Kubernetes, Helm charts, GitOps controller, IaC |
-| Type language | Taxi syntax for semantic type libraries; internal compiler to registry JSON |
+| Canonical model | JSON Schema per entity + state machine definitions |
 | Mapping/conversion | Internal expression language (JSONata-compatible syntax) |
 | API contracts | OpenAPI 3.1 for REST, AsyncAPI for events, JSON Schema for payloads |
 
@@ -543,8 +538,8 @@ wasla/
 │  ├─ connection/  discovery/  connector-runtime/  country-connectors/     (TS)
 │  ├─ ingest-spec/ (TS)  ingest-docs/ ingest-db/ ingest-code/ ingest-traffic/ ingest-documents/ (Py)
 │  ├─ api-generator/  (Py+TS)
-│  ├─ cm-registry/  type-registry/  resolver/                (TS)
-│  ├─ tagging/  designer-agent/  ops-agent/  llm-gateway/  agent-runtime/  evaluation/ (Py)
+│  ├─ cm-registry/  cdm-registry/  canonical-data/          (TS)
+│  ├─ mapping/  designer-agent/  ops-agent/  llm-gateway/  agent-runtime/  evaluation/ (Py)
 │  ├─ spec-service/  spec-compiler/  orchestration/  run-history/  verification/ (TS)
 │  ├─ reconciler/  breaks/  human-tasks/  microapps/        (TS)
 │  ├─ hub-api/  console-bff/  connect-service/              (TS)
@@ -554,13 +549,11 @@ wasla/
 │  ├─ service-kit-ts/  service-kit-py/  service-kit-go/     # auth, tenancy, logging, tracing, outbox/inbox
 │  ├─ contracts/              # OpenAPI, AsyncAPI, JSON Schemas, generated clients
 │  ├─ durable/                # workflow wrappers, activity helpers
-│  ├─ wql/                    # query language parser + AST
 │  ├─ expr/                   # conversion expression language
-│  ├─ taxi-compiler/          # Taxi subset → registry JSON
 │  ├─ policy/                 # authz library
 │  ├─ design-system/  i18n/
 │  └─ sdk-ts/  sdk-py/
-├─ type-libraries/            # embedded-finance/, retail/ ... (Taxi sources)
+├─ canonical-models/          # embedded-finance/, retail/ ... (JSON Schema)
 ├─ country-packs/             # eg/, sa/
 ├─ infra/                     # IaC, Helm charts, GitOps env repos
 ├─ evals/                     # golden datasets, eval configs
@@ -588,8 +581,8 @@ wasla/
 | ADR-002 | Postgres per service schema; no cross-service joins |
 | ADR-003 | Events via transactional outbox; consumers idempotent |
 | ADR-004 | Durable workflows on Temporal, wrapped by internal `durable` library |
-| ADR-005 | Semantic types (Taxi syntax) instead of pairwise mappings |
-| ADR-006 | In-house Resolver in TypeScript with cost-based planning |
+| ADR-005 | Canonical Data Model per vertical; each connection mapped once to it |
+| ADR-006 | Canonical Data Service reads/writes one mapped source per entity with ordered fallbacks |
 | ADR-007 | In-house State Ledger and Money Ledger (Go, append-only Postgres) |
 | ADR-008 | Edge Agent in Go, outbound-only, signed commands |
 | ADR-009 | All agents behind LLM Gateway with mandatory PII Guard |

@@ -4,7 +4,7 @@
 
 ## Why this revision
 
-A second pass over adjacent products — **Integuru** (UI → internal API), **Nango vs. Tray Embedded** (embedded integrations), the open-source **integration platforms** and **Retool alternatives** catalogs, and **Formance** (ledger, reconciliation, money flows) — exposed five gaps in v1.0. None of them changes the core (Capability Model, Integration Spec, durable runtime). They change **how we reach customers**, **what guarantee we sell**, and **how we cover companies with weak or no systems**. A later review of **Orbital / Taxi** added R6, which does change the core: how fields are matched across parties.
+A second pass over adjacent products — **Integuru** (UI → internal API), **Nango vs. Tray Embedded** (embedded integrations), the open-source **integration platforms** and **Retool alternatives** catalogs, and **Formance** (ledger, reconciliation, money flows) — exposed five gaps in v1.0. None of them changes the core (Capability Model, Integration Spec, mapping agent, durable runtime). They change **how we reach customers**, **what guarantee we sell**, and **how we cover companies with weak or no systems**.
 
 | # | Revision | Gap in v1.0 | Borrowed from |
 |---|---|---|---|
@@ -12,8 +12,7 @@ A second pass over adjacent products — **Integuru** (UI → internal API), **N
 | R2 | **Cross-party State Ledger & Reconciler** as a first-class feature | We move data but never prove both sides agree | Formance Ledger + Reconciliation, generalized |
 | R3 | **Connectivity Ladder** with an automatic **Discovery Orchestrator** | Ingestion paths exist, nothing chooses or upgrades between them | Integuru, Nango, Airbyte-style agents |
 | R4 | Scenario 3 re-scoped to **human-as-API** and **generated micro-apps** | "Build the missing system" drifts into services work | Appsmith / ToolJet / NocoBase pattern |
-| R5 | **First hub = fintech / embedded finance** (Egypt first) | Vertical choice left open | Fintech pain in the brief |
-| R6 | **Semantic types** instead of field-to-field mappings | Mappings are per pair, brittle, and limit the network effect | Orbital / Taxi (Apache-2.0 parts only) |
+| R5 | **First hub = fintech / embedded finance** | Vertical choice left open | Fintech pain in the brief |
 
 **What stays the same:** the engine is generic. It integrates any business objects (orders, inventory, shipments, customers, invoices, payments, HR, anything a Capability Model can describe). The fintech choice in R5 is only the first hub, not the product's scope.
 
@@ -204,126 +203,14 @@ Technically the choice is small: it changes the T6 connector (ETA vs. ZATCA Fato
 
 **Requirement from day one:** country is configuration, not code. Tenants carry a region; data residency, e-invoicing connector, tax fields, currency and language are resolved per region, so KSA (in-kingdom hosting included) is a deployment, not a rewrite.
 
-## R6 — Semantic types instead of field-to-field mappings
-
-### Problem
-In v1.0 the mapping agent writes a JSONata mapping for every pair (A→B) or every company→canonical entity. Mappings are the most brittle artifact in the system: they break when either side changes, they are hard to review, and each new hub–spoke pair still needs mapping work. That weakens the network effect.
-
-### Change
-Borrow the core idea of **Orbital** and its **Taxi** language: describe *what each field means* with **semantic types**, and let a query/resolution engine compose sources automatically.
-
-1. A **semantic type library** per vertical replaces most of the rigid canonical entities:
-   ```taxi
-   type TaxRegistrationNumber inherits String
-   type CommercialRegistryNumber inherits String
-   type InvoiceTotal inherits Decimal
-   type CurrencyCode inherits String
-   type MerchantId inherits String
-   ```
-2. Every Capability Model field gets a tag, whatever ladder tier it came from (API, DB, document, human form):
-   ```yaml
-   # inside the CM (OpenAPI 3.1 + our extensions)
-   properties:
-     tax_no:
-       type: string
-       x-taxi-type: { name: TaxRegistrationNumber }
-       x-confidence: 0.94
-       x-provenance: from_db
-   ```
-3. The **mapping agent becomes a tagging agent**: per field it predicts a semantic type with a confidence score (classification, not code generation). Low-confidence tags go to human review, exactly as before.
-4. The **Integration Spec asks for data by meaning**, not by path:
-   ```yaml
-   steps:
-     - id: merchant_profile
-       find: MerchantProfile          # resolved across all of the spoke's sources
-       where: { MerchantId: "{{ trigger.payload.merchant_id }}" }
-       as: [CommercialRegistryNumber, TaxRegistrationNumber, MonthlySalesTotal]
-   ```
-   The resolver works out which connections and calls supply each field and joins them.
-5. **JSONata stays** for real transformations only: currency, units, dates, enum translation, splitting/joining.
-
-### Why it is better
-| | v1.0 mappings | v1.1 semantic types |
-|---|---|---|
-| Work per new hub–spoke pair | New mapping | Usually none: both sides already tagged |
-| Upstream change | Mapping breaks | Re-tag the changed field; queries keep working |
-| Agent task | Generate transform code | Classify a field (easier to evaluate, higher accuracy) |
-| Network effect | Linear | Each tagged spoke is reusable by every hub |
-| Fits the ladder | Per tier | Same tags whatever tier serves the field |
-
-### What we take from Orbital, and what we don't
-The Orbital monorepo is multi-licensed; anything without its own license defaults to **BSL 1.1** (converts to Apache 2.0 four years after each release). Its `LICENSE_FAQ.md` explicitly says a license is required to *"provide configurable integration capabilities to end users"*, *"allow customers to create data pipelines"*, or *"provide services which compete with Orbital"*, which is exactly our product.
-
-| Part | License | Decision |
-|---|---|---|
-| **Taxi** language and tooling (taxilang repo) | Apache 2.0 | **Use**: semantic type definitions, parser, OpenAPI `x-taxi-type` convention |
-| **TaxiQL query engine** and its modules (`taxiql-query-engine`, `vyne-core-types`, `vyne-query-api`, `schema-management/*`, `datatype-converters`, …) | Apache 2.0 (per-module LICENSE files) | **Reference only** for planner design (we build our own resolver, see below) |
-| **Orbital platform** (UI, connectors, pipelines, auth, …) | BSL 1.1 | **Reference only**: UX, schema publishing, architecture |
-
-### Limits to keep in mind
-- **Stack:** Orbital/TaxiQL is Kotlin on the JVM; our plan is TypeScript + Python. This is one reason we build our own resolver.
-- **Reads vs. writes:** Orbital shines at read-time federation (find, join, enrich). Writes, durable flows and reconciliation stay on Temporal + State Ledger. Semantic tags still help there: write targets are addressed by type too.
-- **Vendor continuity:** small company; we only depend on the Apache-licensed parts, so we can fork if needed.
-
-### Decision: we build our own resolver (decided)
-We keep **Taxi** as the type language and build the resolver ourselves in TypeScript. The TaxiQL engine and the Orbital platform become design references only.
-
-**Why**
-- **One stack.** No JVM service to run, secure and upgrade next to a TypeScript/Python platform.
-- **Writes and reconciliation.** The resolver must plan writes, feed the State Ledger and respect ladder tiers; TaxiQL is built for read-time federation.
-- **Tier-aware planning is our IP.** Choosing between a T1 API and a T7 Excel source for the same type, with reliability, latency and consent, is product logic, not something to delegate.
-- **No license edge cases.** No need to audit Orbital's transitive dependencies module by module.
-- **Scope is small.** We need a planner over a typed graph, not a general query language.
-
-### Resolver design v0
-
-**Inputs**
-1. **Type registry**: semantic types, inheritance and composite models, compiled from the Taxi type library at build time into JSON. Taxi stays the authoring format; whether we use the Taxi CLI to emit it or a parser for the subset we use (`type X inherits Y`, `model M { ... }`) is a Phase 0 detail.
-2. **Capability Models** of the parties in scope: each operation becomes an edge with input types, output types, tier, expected latency, rate limits and the consent scope it needs.
-3. **Request**: `find <Model|Type> where {Type: value} as [Type, ...]` (read) or `write <Model> with {...}` (write).
-
-**Type graph**
-```
- nodes  = semantic types
- edges  = operations   (input types ──op@connection──▶ output types)
-        + model fields (Model ──has──▶ Type)
-        + conversions  (Type ──JSONata fn──▶ Type, e.g. currency, units)
-```
-
-**Planner**
-1. Start from the types already known (the `where` values).
-2. For each requested type, search for a path to it over operation and conversion edges (multi-hop allowed: `MerchantId → TaxRegistrationNumber` from the spoke DB, then `TaxRegistrationNumber → Invoice[]` from ETA).
-3. Edge cost = tier weight (T1 cheapest, T8 most expensive) + expected latency + rate-limit pressure; edges outside the hub's consent scope are removed.
-4. Merge paths into one DAG, batch calls that share inputs, and run independent branches in parallel.
-5. If two sources supply the same type, use the cheaper one and optionally fetch both to emit a `value_mismatch` break to the Reconciler.
-6. If a type is unreachable, return a typed error naming the missing capability. The Discovery Orchestrator can then try to find it (e.g. ask for a document, T7, or a human, T8).
-
-**Executor**
-- Runs the plan through the connection adapters; inside an Integration Spec the steps run as Temporal activities, so retries and timeouts come from the runtime.
-- Caches by `(connection, operation, inputs)` with a TTL per tier.
-- Returns every value with **lineage**: source connection, operation, tier, confidence, timestamp. Lineage is written to the State Ledger and shown in the UI ("where did this number come from?").
-
-**Writes**
-- `write` picks the target operation whose input types cover the payload, applies conversions, and adds the idempotency key from the spec. Writes are never multi-target in v0.
-
-**Out of scope for v0**
-Streaming/subscription queries, arbitrary query language, nested aggregations, cross-tenant joins.
-
-### Phase 0 prototype (2–3 weeks, replaces the TaxiQL spike)
-1. Define ~40 semantic types for embedded finance (merchant profile, sales, invoices, payments, bank lines).
-2. Tag two real spoke sources (one Odoo API, one SQL DB) and the ETA e-invoice schema.
-3. Build resolver v0 (registry, graph, planner, executor with lineage) in TypeScript.
-4. Run 10 realistic hub queries (e.g. "merchant profile + last 6 months of sales + issued e-invoices"); target 100% correct results and p95 < 2 s on T1/T3 sources.
-5. Measure tagging-agent accuracy on the same fields.
-
 ---
 
 ## Impact on the roadmap
 
 | Phase | v1.0 | v1.1 |
 |---|---|---|
-| 0 | Pick vertical, CM + IS schemas, infra | Fintech hub in **Egypt** chosen; region-aware tenancy; 1–2 hub design partners with 10–20 spokes each; semantic type library v0 for embedded finance; State Ledger schema; **resolver v0 prototype** (R6) |
-| 1 (MVP) | S1 integrations, mapping agent, runtime, control plane | mapping agent → **semantic tagging agent**; `find`-by-type steps in the spec; + **Connect SDK v1**, + **Reconciler v1** (missing/state breaks, no auto-heal on values), + T6 connector for **ETA (Egypt)** |
+| 0 | Pick vertical, CM + IS schemas, infra | Fintech hub in **Egypt** chosen; region-aware tenancy; 1–2 hub design partners with 10–20 spokes each; canonical model v0 for embedded finance; State Ledger schema |
+| 1 (MVP) | S1 integrations, mapping agent, runtime, control plane | + **Connect SDK v1**, + **Reconciler v1** (missing/state breaks, no auto-heal on values), + T6 connector for **ETA (Egypt)** |
 | 2 | S2: Edge Agent, DB, code, traffic | + **Discovery Orchestrator**, + **T7 documents**, + **T8a human-as-API**, + Formance ledger for money flows |
 | 3 | Network effect & scale | + **KSA launch** (ZATCA connector, in-kingdom deployment), + reuse spoke connections across hubs with consent, agreement score, proof-of-agreement export |
 | 4 | S3 system builder, second vertical | **T8b micro-apps** (optional), second vertical (retail buyer or 3PL hub) |
@@ -335,7 +222,6 @@ Streaming/subscription queries, arbitrary query language, nested aggregations, c
 2. Self-hosted ledger (Formance) vs. our own Postgres ledger for non-money state only
 3. Pricing per connected spoke vs. per reconciled object
 4. Whether spokes get a free self-serve view of their own connections (helps the network, costs support)
-5. ~~Embed TaxiQL or build our own resolver~~ → **Build our own** (TypeScript, Taxi as type language)
 
 ## Sources
 - [Integuru — fintech](https://www.integuru.com/industries/fintech)
@@ -343,6 +229,3 @@ Streaming/subscription queries, arbitrary query language, nested aggregations, c
 - [OpenAlternative — integration platforms](https://openalternative.co/categories/developer-tools/integration-platforms)
 - [OpenAlternative — Retool alternatives](https://openalternative.co/alternatives/retool)
 - [Formance — Flows](https://www.formance.com/platform/flows)
-- [Orbital docs](https://orbitalhq.com/docs)
-- [Orbital on GitHub — license](https://github.com/orbitalapi/orbital?tab=License-1-ov-file) (README, LICENSE and LICENSE_FAQ.md reviewed from a clone; last commit March 2026)
-- [Taxi language](https://taxilang.org)

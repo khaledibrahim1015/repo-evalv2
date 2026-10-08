@@ -70,11 +70,11 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S06 — Consent
 - **Purpose:** spokes' grants to hubs.
-- **Responsibilities:** consent requests (hub, purpose, scopes = data products/semantic types, duration); grant/narrow/revoke; evaluation API (is access to type X for (hub, spoke) allowed?); consent receipts (signed); expiry jobs; history.
+- **Responsibilities:** consent requests (hub, purpose, scopes = data products/canonical entities, duration); grant/narrow/revoke; evaluation API (is access to entity X for (hub, spoke) allowed?); consent receipts (signed); expiry jobs; history.
 - **API:** `/v1/consents`, `/v1/consents/{id}/grant|revoke|narrow`, `/v1/consents/{id}/receipt`, internal `POST /internal/consent/evaluate` (batch).
 - **Events:** pub `consent.requested/granted/narrowed/revoked/expired`.
 - **Data:** consent_requests, consents, consent_scopes, consent_events.
-- **Depends on:** Tenant, Type Registry (scope validation), KMS (signing).
+- **Depends on:** Tenant, Canonical Model Registry (scope validation), KMS (signing).
 - **Scale & SLO:** evaluate p99 < 20 ms (local cache invalidated by events); revocation effective < 60 s.
 - **Phase:** 1.
 
@@ -121,8 +121,8 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 - **Phase:** 1 (metering), 3 (billing).
 
 ### S49 — Search
-- **Purpose:** search across tenant objects and semantic types.
-- **Responsibilities:** index spokes, connections, specs, runs (metadata), breaks, types, fields; full-text (Arabic/English analyzers) + vector similarity; tenant-scoped.
+- **Purpose:** search across tenant objects and canonical entities.
+- **Responsibilities:** index spokes, connections, specs, runs (metadata), breaks, canonical entities, fields; full-text (Arabic/English analyzers) + vector similarity; tenant-scoped.
 - **API:** `/v1/search?q=`; internal indexing via events.
 - **Phase:** 2.
 
@@ -145,7 +145,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 - **API:** `/v1/connections/{id}/discovery` (start, status), internal `/internal/discovery/runs/{id}`.
 - **Events:** pub `discovery.started/tier_selected/completed/failed/upgrade_available`; sub `connection.created`, `cm.diff_detected`, connector error signals.
 - **Data:** discovery_runs, tier_decisions, worker_results (refs).
-- **Depends on:** ingestion workers S14–S19, S21, CM Registry, Tagging.
+- **Depends on:** ingestion workers S14–S19, S21, CM Registry, Mapping.
 - **Phase:** 1 (T1, T3, T6, T7), 2 (all tiers, upgrades).
 
 ### S14 — Spec Ingestor (T1)
@@ -200,7 +200,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S21 — Country Connectors (T6)
 - **Purpose:** shared external sources per country.
-- **Responsibilities:** **Egypt ETA**: e-invoice and e-receipt APIs (authentication with taxpayer client credentials, document search, document details, submission status), mapping to embedded-finance types; **KSA ZATCA** (Phase 3); bank statement ingestion (MT940/CAMT/CSV) and open-banking providers when available; marketplace connectors (P2).
+- **Responsibilities:** **Egypt ETA**: e-invoice and e-receipt APIs (authentication with taxpayer client credentials, document search, document details, submission status), mapping templates to the embedded-finance canonical model; **KSA ZATCA** (Phase 3); bank statement ingestion (MT940/CAMT/CSV) and open-banking providers when available; marketplace connectors (P2).
 - **API:** registered as connectors in Connector Runtime + CM templates.
 - **Phase:** 1 (ETA), 3 (ZATCA, bank statements), 5 (marketplaces).
 
@@ -219,38 +219,38 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ---
 
-## Semantics
+## Canonical data
 
 ### S24 — Capability Model Registry
 - **Purpose:** source of truth for CMs.
-- **Responsibilities:** store CM versions per connection (OpenAPI 3.1 + `x-wasla-*` extensions: entity, provenance, confidence, tier, pii, rate limits, events, `x-taxi-type` tags); validation; diff between versions and change classification (additive / breaking / semantic); query APIs for Resolver (operations by input/output types); PII classification storage.
-- **API:** `/internal/cms/{connection}/versions`, `/internal/cms/{connection}/diff?from&to`, `/internal/cms/operations?types=`; Studio read APIs.
-- **Events:** pub `cm.version_published`, `cm.diff_detected`; sub `tags.confirmed`.
+- **Responsibilities:** store CM versions per connection (OpenAPI 3.1 + `x-wasla-*` extensions: entity, provenance, confidence, tier, pii, rate limits, events); validation; diff between versions and change classification (additive / breaking / mapping-affecting); query APIs for Mapping and CDS (operations by entity); PII classification storage.
+- **API:** `/internal/cms/{connection}/versions`, `/internal/cms/{connection}/diff?from&to`, `/internal/cms/operations?entity=`; Studio read APIs.
+- **Events:** pub `cm.version_published`, `cm.diff_detected`.
 - **Data:** cm_versions (JSONB), operations index, field index.
 - **Phase:** 1.
 
-### S25 — Semantic Type Registry
-- **Purpose:** semantic type libraries.
-- **Responsibilities:** Taxi-syntax sources in Git per vertical; compiler (subset: `type X inherits Y`, `enum`, `model M { field: Type }`, docs/annotations) → registry JSON; versioning and compatibility checks (no breaking renames without alias); lookup and graph APIs; embeddings for each type (name, docs, examples).
-- **API:** `/internal/types?library=&version=`, `/internal/types/graph`, Studio `/v1/studio/type-libraries/*`; CLI `wasla types compile|publish`.
-- **Events:** pub `types.library_published`.
+### S25 — Canonical Model Registry
+- **Purpose:** source of truth for each vertical's Canonical Data Model.
+- **Responsibilities:** JSON Schema entity definitions in Git per vertical; state machines and reconciliation-tracked fields per entity; validation and compatibility checks (additive within a major version); publish/version; lookup APIs; embeddings per entity/field (names, docs, examples) for the mapping agent.
+- **API:** `/internal/cdm?vertical=&version=`, `/internal/cdm/entities/{name}`, Studio `/v1/studio/canonical-models/*`; CLI `wasla cdm validate|publish`.
+- **Events:** pub `cdm.version_published`.
 - **Phase:** 0.
 
-### S26 — Tagging Service
-- **Purpose:** assign semantic types to CM fields.
-- **Responsibilities:** candidate generation (name/description similarity, embeddings, data type, value patterns, sample values, sibling fields, known-system priors); ranking model + LLM adjudication for ambiguous cases; confidence calibration; thresholds per library; review queue items; learning from confirmations (per-system priors, per-spoke templates); bulk re-tag after library changes.
-- **API:** internal `POST /internal/tagging/jobs`, `/v1/studio/tag-reviews` (list, accept, correct, bulk).
-- **Events:** pub `tags.proposed/confirmed`; sub `cm.version_published`, `types.library_published`.
-- **Data:** tags, tag_reviews, priors, embeddings.
+### S26 — Mapping Service
+- **Purpose:** map each connection's CM to canonical entities.
+- **Responsibilities:** per (connection, entity): choose source operations (list/get/write); candidate field matches (names/descriptions, embeddings, data types, value patterns, samples); mapping agent proposes field expressions, enum maps, conversions and filter translation; confidence per field; review queue; **mapping templates per known system** reused across spokes; learning from confirmations; re-mapping proposals on CM diff or CDM version change.
+- **API:** internal `POST /internal/mapping/jobs`, `GET /internal/mapping/{connection}/{entity}`; Studio `/v1/studio/mapping-reviews` (list, accept, correct, bulk), `/v1/studio/mapping-templates`.
+- **Events:** pub `mapping.proposed/confirmed`; sub `cm.version_published`, `cm.diff_detected`, `cdm.version_published`.
+- **Data:** mappings (versioned), mapping_reviews, templates, embeddings.
 - **Phase:** 1.
 
-### S27 — Resolver
-- **Purpose:** query and write by meaning.
-- **Responsibilities:** see architecture §7: type graph builder, consent filter, cost-based planner, executor, converter, lineage, cache, write planner, explain; WQL parser (text and JSON).
-- **API:** `POST /internal/resolve/query`, `POST /internal/resolve/write`, `POST /internal/resolve/explain`; exposed publicly through Hub API.
-- **Events:** pub `usage.recorded`, `resolver.unreachable_type`; sub `tags.confirmed`, `cm.version_published`, `types.library_published`, `consent.*` (cache invalidation).
-- **Scale & SLO:** stateless with shared cache; planning p95 < 50 ms; end-to-end p95 < 2 s (T1/T3).
-- **Phase:** 0 (prototype), 1 (production).
+### S27 — Canonical Data Service (CDS)
+- **Purpose:** read and write canonical entities for a party.
+- **Responsibilities:** see architecture §7.3: source selection with ordered fallbacks, consent check, filter translation, execution through Connector Runtime, mapping and CDM validation, source metadata per record, cache, writes with reverse mapping, dry-run and idempotency; change feed (P2).
+- **API:** `GET /internal/cds/{party}/{entity}` (list with filters/cursor), `GET /internal/cds/{party}/{entity}/{id}`, `POST /internal/cds/{party}/{entity}` (write, `dry_run`); exposed publicly through Hub API as `/v1/spokes/{id}/data/{entity}`.
+- **Events:** pub `usage.recorded`, `cds.entity_unavailable`; sub `mapping.confirmed`, `cm.version_published`, `consent.*`, CDC topics (cache invalidation).
+- **Scale & SLO:** stateless with shared cache; overhead p95 < 50 ms; end-to-end p95 < 2 s (T1/T3).
+- **Phase:** 1.
 
 ---
 
@@ -258,26 +258,26 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S28 — Integration Spec Service
 - **Purpose:** author, version, approve and activate specs.
-- **Responsibilities:** CRUD of specs (YAML) per hub–spoke link or per hub template; data-product templates (hub-level templates applied to each spoke automatically); validation (schema + CM + types + consent); versioning in Git; approval workflow (both parties; policies for auto-approval of template instances); activation/pause/rollback; diff views.
+- **Responsibilities:** CRUD of specs (YAML) per hub–spoke link or per hub template; data-product templates (hub-level templates applied to each spoke automatically); validation (schema + CM + mappings + canonical model + consent); versioning in Git; approval workflow (both parties; policies for auto-approval of template instances); activation/pause/rollback; diff views.
 - **API:** `/v1/integrations`, `/v1/integrations/{id}/versions`, `/v1/integrations/{id}/approve|activate|pause|rollback`, `/v1/data-products`.
 - **Events:** pub `spec.submitted/approved/activated/paused/rolled_back`; sub `cm.diff_detected` (pause on breaking), `consent.revoked`.
 - **Phase:** 1.
 
 ### S29 — Designer Agent
 - **Purpose:** turn intent into a spec.
-- **Responsibilities:** input business intent + parties' CMs + types; produce spec draft, test fixtures and explanation; iterate on validation errors; never activates.
+- **Responsibilities:** input business intent + parties' CMs + canonical model; produce spec draft, test fixtures and explanation; iterate on validation errors; never activates.
 - **API:** internal `POST /internal/designer/drafts`.
 - **Phase:** 2.
 
 ### S30 — Spec Compiler
 - **Purpose:** compile specs into executable workflow definitions.
-- **Responsibilities:** parse YAML → IR; resolve step references; static checks (types reachable, idempotency keys present for writes, reconciliation config valid); generate workflow plan for Orchestration (interpreted IR, not code generation); generate reconciliation job config; generate mocks/test plans for Verification.
+- **Responsibilities:** parse YAML → IR; resolve step references; static checks (entities mapped for the parties, idempotency keys present for writes, reconciliation config valid); generate workflow plan for Orchestration (interpreted IR, not code generation); generate reconciliation job config; generate mocks/test plans for Verification.
 - **API:** internal `POST /internal/compile`.
 - **Phase:** 1.
 
 ### S31 — Orchestration Runtime
 - **Purpose:** execute runs durably.
-- **Responsibilities:** generic interpreter workflow executing compiled IR; trigger adapters (webhook events, schedules, polls, CDC events, API calls, human task replies); activities: resolver find/write, convert, human task, code (sandbox), ledger transition/post, notify; retry policies, timeouts, DLQ, per-key ordering (workflow id = key), concurrency limits per tenant/connection; pause/resume; replay.
+- **Responsibilities:** generic interpreter workflow executing compiled IR; trigger adapters (webhook events, schedules, polls, CDC events, API calls, human task replies); activities: CDS fetch/write, convert, human task, code (sandbox), ledger transition/post, notify; retry policies, timeouts, DLQ, per-key ordering (workflow id = key), concurrency limits per tenant/connection; pause/resume; replay.
 - **API:** internal `/internal/runs` (start, signal, cancel), triggers via events.
 - **Events:** pub `run.*`, `usage.recorded`; sub `webhook.received`, `spec.activated/paused`, `task.answered`, CDC topics.
 - **Data:** Temporal + Postgres (trigger registry, schedules).
@@ -294,7 +294,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S33 — Verification Service
 - **Purpose:** prove an integration before go-live.
-- **Responsibilities:** generate mocks from CMs; contract tests (spec steps vs CMs); golden tests for conversions and tags from samples; recorded payload replay in sandbox; fuzz/property tests for generated APIs (P2); test reports attached to spec versions; go-live gate evaluation.
+- **Responsibilities:** generate mocks from CMs; contract tests (spec steps vs CMs); golden tests for mappings from samples; recorded payload replay in sandbox; fuzz/property tests for generated APIs (P2); test reports attached to spec versions; go-live gate evaluation.
 - **API:** internal `POST /internal/verify/{spec_version}`; `/v1/integrations/{id}/versions/{v}/test-report`.
 - **Phase:** 1.
 
@@ -304,7 +304,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S34 — State Ledger
 - **Purpose:** record every cross-party object and its history.
-- **Responsibilities:** tracked objects (model, canonical key, parties' external ids, current state); state machines per model (defined in type library/spec); append-only transitions (from, to, source party, run id, payload hash, time); per-party observed views (last seen hash, time); hash-chained entries per object; queries by key/state/time; export.
+- **Responsibilities:** tracked objects (model, canonical key, parties' external ids, current state); state machines per entity (defined in the canonical model/spec); append-only transitions (from, to, source party, run id, payload hash, time); per-party observed views (last seen hash, time); hash-chained entries per object; queries by key/state/time; export.
 - **API:** internal `POST /internal/ledger/transition`, `POST /internal/ledger/observe`, `GET /internal/ledger/objects`; public read via Hub API `/v1/objects`.
 - **Events:** pub `ledger.object_transitioned`.
 - **Data:** objects, transitions (partitioned), observations.
@@ -321,14 +321,14 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S36 — Reconciler
 - **Purpose:** detect disagreement.
-- **Responsibilities:** schedule recon jobs per integration (cron from spec); cursor through ledger objects within lookback; fetch parties' current views via Resolver in batches; compare tracked fields with tolerance; classify breaks; auto-heal per policy (request replay/resync); compute agreement scores; payment matching rules + agent suggestions for orphan money (P1).
+- **Responsibilities:** schedule recon jobs per integration (cron from spec); cursor through ledger objects within lookback; fetch parties' current views via CDS in batches; compare tracked fields with tolerance; classify breaks; auto-heal per policy (request replay/resync); compute agreement scores; payment matching rules + agent suggestions for orphan money (P1).
 - **API:** internal `/internal/recon/jobs`; `/v1/integrations/{id}/agreement`, `/v1/agreement-score`.
 - **Events:** pub `recon.completed`, `recon.break_detected`; sub `ledger.object_transitioned` (for near-real-time checks), `spec.activated`.
 - **Phase:** 1 (missing/state/stale), 2 (value, orphan money, matching).
 
 ### S37 — Breaks & Cases
 - **Purpose:** manage disagreements to resolution.
-- **Responsibilities:** break records with type, objects, evidence (both views, lineage); shared inbox visible to both parties according to roles; assignment, comments, attachments, SLA timers; suggested resolution (from Ops Agent); resolution actions (accept A / accept B / replay / manual note); proof-of-agreement export (signed report) (P1).
+- **Responsibilities:** break records with type, objects, evidence (both views, source metadata); shared inbox visible to both parties according to roles; assignment, comments, attachments, SLA timers; suggested resolution (from Ops Agent); resolution actions (accept A / accept B / replay / manual note); proof-of-agreement export (signed report) (P1).
 - **API:** `/v1/breaks`, `/v1/breaks/{id}` (assign, comment, resolve), `/v1/agreement-reports`.
 - **Events:** pub `recon.break_resolved`, sub `recon.break_detected`.
 - **Phase:** 1.
@@ -346,7 +346,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S39 — Micro-app Platform (T8b)
 - **Purpose:** minimal systems for parties without one.
-- **Responsibilities:** app generator from selected models (lists, forms, detail views, status boards, import/export, simple roles); per-app schema storage; mobile-first PWA; Arabic/English; app data automatically exposed as T1 capabilities (CM generated); upgrades when type library changes.
+- **Responsibilities:** app generator from selected canonical entities (lists, forms, detail views, status boards, import/export, simple roles); per-app schema storage; mobile-first PWA; Arabic/English; app data automatically exposed as T1 capabilities (CM generated); upgrades when the canonical model changes.
 - **API:** `/v1/microapps`, `/v1/microapps/{id}/data/*`, app runtime at `{spoke}.apps.wasla...`.
 - **Phase:** 4.
 
@@ -368,7 +368,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S42 — Evaluation Service
 - **Purpose:** measure agents.
-- **Responsibilities:** golden datasets (tags, discovery, extraction, designer, reply parsing) built from confirmed production data (masked); eval runs per prompt/model change; metrics (precision/recall, accuracy, cost, latency); regression gates in CI; dashboards in Studio.
+- **Responsibilities:** golden datasets (mappings, discovery, extraction, designer, reply parsing) built from confirmed production data (masked); eval runs per prompt/model change; metrics (precision/recall, accuracy, cost, latency); regression gates in CI; dashboards in Studio.
 - **API:** `/internal/evals/*`; Studio views.
 - **Phase:** 1.
 
@@ -380,7 +380,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S44 — Ops Agent
 - **Purpose:** automated diagnosis and fix proposals.
-- **Responsibilities:** consume failures, DLQ, drift, breaks; cluster incidents; diagnose root cause using run history, CMs, lineage; propose changes (re-tag, spec patch, conversion fix, connection re-auth) as change requests for approval; incident timeline per integration.
+- **Responsibilities:** consume failures, DLQ, drift, breaks; cluster incidents; diagnose root cause using run history, CMs, mappings; propose changes (re-map, spec patch, conversion fix, connection re-auth) as change requests for approval; incident timeline per integration.
 - **API:** `/v1/studio/ops/proposals`, `/v1/integrations/{id}/incidents`.
 - **Events:** sub `run.dead_lettered`, `cm.diff_detected`, `recon.break_detected`, `connector.error_pattern`; pub `ops.proposal_created`.
 - **Phase:** 2.
@@ -391,7 +391,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S45 — Hub Public API
 - **Purpose:** public developer surface for hubs.
-- **Responsibilities:** `/v1` resources: spokes, invitations, connections (status), consents, query, write, explain, integrations, runs, objects, money, breaks, agreement, webhooks (endpoints, deliveries, replay), events catalog; outbound webhook delivery with signing/retries; SDK generation (TS, Python).
+- **Responsibilities:** `/v1` resources: spokes, invitations, connections (status), consents, canonical data (read/write, dry-run), integrations, runs, objects, money, breaks, agreement, webhooks (endpoints, deliveries, replay), events catalog; outbound webhook delivery with signing/retries; SDK generation (TS, Python).
 - **Events:** sub public-facing events; pub `webhook.delivery_*`.
 - **Phase:** 1.
 
@@ -408,7 +408,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S48 — Developer Portal
 - **Purpose:** docs and self-serve developer onboarding.
-- **Responsibilities:** guides, API reference (from OpenAPI), event catalog (from AsyncAPI), WQL reference, type library browser, sandbox keys, changelog.
+- **Responsibilities:** guides, API reference (from OpenAPI), event catalog (from AsyncAPI), canonical model browser, sandbox keys, changelog.
 - **Phase:** 1.
 
 ### Front-end applications
@@ -416,7 +416,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 |---|---|---|
 | **Hub Console** | Overview (spokes by tier/status, agreement), Spokes (list, detail, connections, consent), Data products, Integrations (specs, versions, approvals, tests), Runs & DLQ, Objects & ledger, Breaks inbox, Webhooks, API keys, Team, Usage & billing, Settings | 1 |
 | **Spoke Portal** | My connections & health, Hubs with access & consent, Tasks, Breaks involving me, Edge Agent status, Micro-apps (P4), Team | 1 |
-| **Wasla Studio** | Review queues (tags, discovery, documents), Tenants & directory, Type library editor, Country packs, Known-systems catalog, Agent evals, Ops proposals, Support tools (JIT access) | 1 |
+| **Wasla Studio** | Review queues (mappings, discovery, documents), Tenants & directory, Canonical model editor, Mapping templates, Country packs, Known-systems catalog, Agent evals, Ops proposals, Support tools (JIT access) | 1 |
 | **Connect** | Invite landing, consent, system picker, tier flows, progress | 1 |
 
 ### S50 — Observability Platform

@@ -2,7 +2,7 @@
 
 *Version 1.1 · October 2026*
 
-> **v1.1 changes** (details in [design revisions](agentic-integration-engine-design-revisions.md)): hub-and-spoke go-to-market with an embeddable Connect SDK (R1), cross-party State Ledger & Reconciler (R2), Connectivity Ladder with a Discovery Orchestrator (R3), Scenario 3 re-scoped to human-as-API and micro-apps (R4), fintech in Egypt chosen as the first hub (R5), semantic types (Taxi) instead of field-to-field mappings (R6).
+> **v1.1 changes** (details in [design revisions](agentic-integration-engine-design-revisions.md)): hub-and-spoke go-to-market with an embeddable Connect SDK (R1), cross-party State Ledger & Reconciler (R2), Connectivity Ladder with a Discovery Orchestrator (R3), Scenario 3 re-scoped to human-as-API and micro-apps (R4), fintech chosen as the first hub (R5).
 
 ---
 
@@ -42,8 +42,8 @@ Every ingestion path (Swagger, Postman, PDF docs, codebase, DB, browser traffic)
 
 > Internally, the CM can be an OpenAPI 3.1 document plus our own extension fields (`x-entity`, `x-provenance`, `x-confidence`, `x-events`). This gives us free tooling (linting, mocks, SDK gen) while keeping our own semantics.
 
-### 1.2 Canonical Domain Model (per vertical) — semantic types since v1.1
-A shared vocabulary per industry, expressed as **semantic types** in the **Taxi** language (Apache 2.0), e.g. `TaxRegistrationNumber`, `InvoiceTotal`, `MerchantId`, plus a small set of composite models (MerchantProfile, Invoice, Payment) built from them. Every field in a company's CM is **tagged** with a semantic type (`x-taxi-type`) once, whatever tier it came from. Then **any two companies already tagged can be connected almost automatically**: a resolver finds which sources supply each requested type and joins them. This is the network-effect mechanism. Details and license boundaries in design revisions R6.
+### 1.2 Canonical Domain Model (per vertical)
+A shared vocabulary per industry (e.g. logistics: Shipment, Consignee, Waybill, POD). Each company's CM is mapped to the canonical model once. Then **any two companies already mapped can be connected almost automatically**. This is the network-effect mechanism.
 
 ### 1.3 Integration Spec (IS)
 Our own **declarative format** describing one integration between A and B. The agent writes it; humans review it; the runtime executes it. Code is the escape hatch, not the default.
@@ -117,7 +117,7 @@ flowchart TB
   CDM[(Canonical Domain Models per vertical - BUILD)]
 
   subgraph Design["3. Design & Generation (BUILD)"]
-    M[Semantic tagging agent]
+    M[Mapping agent]
     G[Integration Spec generator]
     A[API generator - S2]
     B[System builder - S3]
@@ -194,15 +194,14 @@ Legend: **🟢 OSS covers it** · **🟡 OSS + our layer** · **🔴 We build it
 - Seed from existing standards where possible (e.g. GS1 / UBL for orders & invoices, HL7 FHIR for health, EDI X12/EDIFACT segments for logistics)
 - Versioned; every company CM gets a stored mapping to the canonical model
 
-### 3.4 Semantic tagging agent + resolver 🟡 (core IP; reworked in v1.1)
-Tags every CM field with a semantic type instead of writing pairwise mappings.
+### 3.4 Mapping agent 🔴 (core IP)
+Proposes how A's entities/fields map to B's (or to canonical).
 
-- Candidate matching: name similarity, embeddings, types, sample values, constraints → predicted semantic type + confidence
-- Low-confidence tags go to human review; confirmed tags become eval data
-- **Resolver:** given a `find` request by semantic type, plans which connections/operations supply each field and joins them. **We build it** in TypeScript over a type graph compiled from Taxi: tier-aware cost-based planning, consent filtering, parallel execution as Temporal activities, and per-value lineage (design in design revisions R6). TaxiQL / Orbital are design references only
-- Transformations that are real conversions (unit/currency/date/timezone, enum mapping, splitting/joining) remain in **JSONata** (MIT)
-- **OSS used:** **Taxi** (Apache 2.0) for type definitions; JSONata; embeddings via pgvector
-- **Not used:** the Orbital platform itself (BSL 1.1; its license FAQ requires a license for configurable integration offered to end users and for competing services)
+- Candidate matching: name similarity, embeddings, types, sample values, constraints
+- Transformations: unit/currency/date/timezone conversion, enum mapping, splitting/joining fields, lookups
+- Output: a mapping file in a declarative transform language
+- Every mapping has confidence; low-confidence items go to human review
+- **OSS used:** **JSONata** (transform expression language, MIT) as the execution format for mappings; embeddings via pgvector
 
 ### 3.5 Integration Spec generator & compiler 🔴
 - Agent turns a business intent ("sync new orders from B to A, push shipment status back") + two CMs + mappings → Integration Spec (YAML above)
@@ -338,7 +337,7 @@ Walks the ladder **per entity** and records the chosen tier in the CM:
 | **Code Analyzer** | Repo (read-only) | CM: entities, operations, side effects | Engineer confirms operations list |
 | **DB Introspector** | DB connection (read-only) | CM entities + sample-based semantics | Confirm PII & entity meaning |
 | **Traffic Analyzer** | HAR / captured traffic | CM + client code | Confirm with system owner |
-| **Semantic Tagging Agent** (was Mapping Agent) | CM fields + samples + semantic type library | `x-taxi-type` tags with confidence; JSONata only for conversions | Confirm all tags < threshold |
+| **Mapping Agent** | Two CMs (+ canonical) | Mapping files (JSONata) | Confirm all mappings < threshold |
 | **Integration Designer** | Business intent + CMs + mappings | Integration Spec YAML | Both parties approve |
 | **API Builder** (S2) | CM from code/DB | Generated API service + OpenAPI + tests | Code review |
 | **Test Author** | Spec + CMs + samples | Contract, fuzz, golden tests | Auto (must pass) |
@@ -406,7 +405,7 @@ Agents must be measured, not trusted.
 | Doc / code / DB / traffic discovery | ~25% | Parsers are OSS; the agents are ours |
 | API generation (S2) | ~40% | PostgREST/Debezium for DB; code path is ours |
 | Verification | ~60% | Prism, Schemathesis, Pact; we add orchestration & gating |
-| Semantic types & resolver | ~10% | Taxi language is OSS; resolver, type libraries & tagging agent are core IP |
+| Mapping & canonical models | ~10% | Core IP |
 | Integration Spec & compiler | ~10% | Core IP |
 | Two-sided control plane | ~20% | Auth & UI scaffolding OSS; product logic ours |
 | System builder (S3) → micro-apps | ~40% | Frameworks OSS; generator ours |
@@ -425,7 +424,6 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 - First hub vertical: **fintech / embedded finance in Egypt**; sign 1–2 hub design partners with 10–20 spokes each
 - Draft canonical domain model v0 for that vertical
 - Define Capability Model schema, Integration Spec v0, and State Ledger schema
-- Semantic type library v0 (~40 types for embedded finance) + **resolver v0 prototype** in TypeScript (2–3 weeks)
 - Region-aware tenancy: data residency, e-invoicing connector, tax fields, currency and language resolved per region
 - Stand up infra skeleton: Kubernetes, Postgres, Temporal, Keycloak, OpenBao, OTel stack
 - **Exit criteria:** design partners signed; CM + IS schemas reviewed
@@ -433,7 +431,7 @@ Timelines assume a core team of 5–7 engineers. Adjust to actual team.
 ### Phase 1 — MVP: Scenario 1 (Months 2–4)
 - Ingestion: OpenAPI + Postman (+ basic doc reader)
 - CM registry with versioning and diff
-- Semantic tagging agent v1 with human review UI; `find`-by-type steps in the Integration Spec
+- Mapping agent v1 with human review UI
 - Integration Spec generator + compiler → Temporal
 - Verification: Prism mocks + Schemathesis + golden tests
 - Runtime: retries, DLQ, replay, idempotency, alerts
@@ -513,7 +511,6 @@ Integration engineers are critical early: they deliver for design partners **and
 5. **Ownership of generated code** (S2/S3): customer owns it vs. licensed from us
 6. **Ledger scope:** Formance for money only, or for all state? (recommended: Formance for money, own Postgres State Ledger for the rest)
 7. **Spoke self-serve view:** free view of their own connections across hubs?
-8. ~~**Resolver:** embed TaxiQL or build our own?~~ → **Decided:** build our own in TypeScript; Taxi stays the type language
 
 ---
 
@@ -556,7 +553,6 @@ Integration engineers are critical early: they deliver for design partners **and
 | Refine / React-Admin | Admin UI | MIT |
 | Formance Ledger | Double-entry money ledger | MIT (verify) |
 | Appsmith | Low-code app builder (T8b reference/base) | Apache 2.0 (verify) |
-| Taxi | Semantic type language & tooling | Apache 2.0 |
 
 ## Appendix B — Use as reference only (don't build core on them)
 
@@ -569,5 +565,3 @@ Integration engineers are critical early: they deliver for design partners **and
 | Directus / NocoDB | Check current terms before using in S3 templates |
 | ToolJet / NocoBase | AGPL — reference for T8b micro-app pattern |
 | Tray Embedded | Closed source — reference for the embedded Connect UX |
-| TaxiQL query engine | Apache 2.0 modules, but we build our own resolver — reference for query planning |
-| Orbital platform | BSL 1.1 (default for modules without their own license); license FAQ requires a license for end-user-configurable integration and competing services — reference for semantic integration UX & architecture |

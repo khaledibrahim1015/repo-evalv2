@@ -62,13 +62,13 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 
 ## 2. Phase 0 — Foundations (Weeks 0–6)
 
-**Goal:** platform skeleton running in staging; semantic types and resolver proven on real data; design partners signed.
+**Goal:** platform skeleton running in staging; canonical model and mapping proven on real data; design partners signed.
 
 **Exit criteria**
-- Staging cell up with CI/CD, observability, IAM, Tenant, KMS, Audit, Type Registry, LLM Gateway, Agent Runtime.
-- Embedded-finance type library v0 (~40 types, ~8 models) compiled.
-- Resolver prototype answers 10 hub queries across Odoo API + SQL DB + ETA sample with 100% correct results, p95 < 2 s.
-- Tagging prototype ≥ 80% top-1 accuracy on the 3 sample sources.
+- Staging cell up with CI/CD, observability, IAM, Tenant, KMS, Audit, Canonical Model Registry, LLM Gateway, Agent Runtime.
+- Embedded-finance canonical model v0 (~8 entities) published.
+- Mapping prototype maps Odoo API + sample SQL DB + ETA to the canonical model; 10 hub reads return 100% correct canonical records, p95 < 2 s.
+- Mapping agent ≥ 80% field accuracy on the 3 sample sources.
 - 1–2 Egyptian fintech hubs signed as design partners with ≥ 20 spokes each identified.
 
 ### E0.1 Product & discovery
@@ -117,20 +117,21 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T0.4.4 | KMS v0: key hierarchy, encrypt/decrypt, secret store, internal CA | S07 | GO | 3 | T0.3.7 |
 | T0.4.5 | Audit v0: ingest, hash chain, tenant query | S09 | GO | 1.5 | T0.2.6 |
 
-### E0.5 Semantics prototype
+### E0.5 Canonical model & mapping prototype
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T0.5.1 | Define Taxi subset grammar for type libraries (types, inherits, enums, models, annotations) | S25 | TL | 0.5 | — |
-| T0.5.2 | `taxi-compiler` package: parser → AST → registry JSON; errors with positions | S25 | BE | 2 | T0.5.1 |
-| T0.5.3 | Embedded-finance type library v0 (~40 types, ~8 models) with docs and examples (AR/EN) | — | DOM, TL | 2 | T0.1.3 |
-| T0.5.4 | Type Registry service v0: publish, version, lookup, graph API | S25 | BE | 1.5 | T0.5.2 |
-| T0.5.5 | CM schema v0: OpenAPI 3.1 + `x-wasla-*` extensions; JSON Schema for validation | S24 | TL | 1 | — |
-| T0.5.6 | Hand-build CMs for Odoo (API), sample SQL DB, ETA e-invoice schema; tag manually | — | IE*, TL | 1 | T0.5.5 |
-| T0.5.7 | WQL v0 grammar + parser (text and JSON) | S27 | BE | 1.5 | T0.5.1 |
-| T0.5.8 | Resolver prototype: graph builder, planner (cost-based search, DAG merge), executor, converter (currency, dates), lineage | S27 | TL, BE | 4 | T0.5.4, T0.5.7 |
-| T0.5.9 | Prototype adapters: HTTP (Odoo), SQL (direct in staging), ETA sandbox | S20 | BE | 1.5 | — |
-| T0.5.10 | Run 10 hub queries; measure correctness and latency; report | — | TL | 0.5 | T0.5.8 |
-| T0.5.11 | Tagging prototype: candidate generation + LLM adjudication; accuracy on T0.5.6 data | S26 | AI | 2 | T0.6.1 |
+| T0.5.1 | Canonical model format: JSON Schema conventions, identity keys, state machines, tracked fields | S25 | TL | 0.5 | — |
+| T0.5.2 | Embedded-finance canonical model v0 (~8 entities) with docs and examples (AR/EN) | — | DOM, TL | 2 | T0.1.3, T0.5.1 |
+| T0.5.3 | Canonical Model Registry v0: validate, publish, version, lookup | S25 | BE | 1.5 | T0.5.1 |
+| T0.5.4 | CM schema v0: OpenAPI 3.1 + `x-wasla-*` extensions; JSON Schema for validation | S24 | TL | 1 | — |
+| T0.5.5 | Hand-build CMs for Odoo (API), sample SQL DB, ETA e-invoice schema | — | IE*, TL | 1 | T0.5.4 |
+| T0.5.6 | Mapping format v0: source operations, filter translation, field expressions, enum maps, conversions | S26 | TL | 1 | T0.5.1 |
+| T0.5.7 | Expression language v0 (JSONata-compatible syntax) + conversions (currency, dates, units) | S27 | BE | 2 | — |
+| T0.5.8 | Hand-write mappings for the 3 sources (golden reference) | — | IE*, DOM | 1 | T0.5.5, T0.5.6 |
+| T0.5.9 | CDS prototype: source selection, filter translation, execution, mapping, CDM validation, source metadata | S27 | BE | 3 | T0.5.7, T0.5.8 |
+| T0.5.10 | Prototype adapters: HTTP (Odoo), SQL (direct in staging), ETA sandbox | S20 | BE | 1.5 | — |
+| T0.5.11 | Run 10 hub reads; measure correctness and latency; report | — | TL | 0.5 | T0.5.9 |
+| T0.5.12 | Mapping agent prototype: field candidates + LLM proposals; accuracy vs T0.5.8 | S26 | AI | 2 | T0.6.1 |
 
 \*IE joins at end of Phase 0; TL covers before.
 
@@ -153,12 +154,12 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 
 ## 3. Phase 1 — MVP: Egypt fintech hub (Weeks 6–20)
 
-**Goal:** first hub in production with real spokes across at least three ladder tiers, queries by meaning, durable runs, and reconciliation.
+**Goal:** first hub in production with real spokes across at least three ladder tiers, canonical data reads, durable runs, and reconciliation.
 
 **Exit criteria**
 - 1 hub live; ≥ 20 spokes connected using ≥ 3 tiers (T1, T3, T6, T7 available).
 - Data products live: Merchant Profile, Sales History, Issued E-Invoices, Customers, Payment Status write-back (T1/T3 dry-run + approved writes).
-- ≥ 60% fields auto-tagged above threshold; median spoke onboarding < 1 day.
+- ≥ 60% fields auto-mapped above threshold; median spoke onboarding < 1 day.
 - ≥ 99.5% run success after retries; ≥ 99% agreement score on reconciled objects.
 - Production cell live in Egypt with backups, on-call, runbooks; external pen test passed (no high findings open).
 
@@ -201,34 +202,34 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T1.3.13 | Connector Runtime: HTTP/REST adapter, auth injection, pagination strategies, retries, breaker, rate limits | S20 | BE | 3 | T1.3.1 |
 | T1.3.14 | Connector Runtime: SQL-via-Edge adapter | S20 | BE | 1 | T1.3.8 |
 | T1.3.15 | Connector Runtime: document-dataset adapter (T7 records as operations) | S20 | BE | 1 | T1.4.6 |
-| T1.3.16 | ETA connector: auth, document search, document details, status; CM template tagged with types | S21 | BE, DOM | 2.5 | T1.3.13 |
+| T1.3.16 | ETA connector: auth, document search, document details, status; CM + mapping template to the canonical model | S21 | BE, DOM | 2.5 | T1.3.13 |
 
 ### E1.4 Discovery & ingestion
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T1.4.1 | Discovery Orchestrator: workflow per connection, tier selection rules per entity, merge to CM, status events | S13 | BE | 3 | T0.2.8 |
-| T1.4.2 | Spec Ingestor: OpenAPI 2/3 parse/normalize, Postman → OpenAPI, pagination/auth/error inference | S14 | BE | 2.5 | T0.5.5 |
+| T1.4.2 | Spec Ingestor: OpenAPI 2/3 parse/normalize, Postman → OpenAPI, pagination/auth/error inference | S14 | BE | 2.5 | T0.5.4 |
 | T1.4.3 | DB Introspector: schema, keys, samples (masked), entity inference, PII detection, generated read ops | S16 | AI | 3 | T1.3.8 |
 | T1.4.4 | Document Extractor: upload endpoint, Excel/CSV structure detection (AR/EN headers), typed records + confidence | S19 | AI | 3 | T0.6.3 |
 | T1.4.5 | Document Extractor: per-spoke template learning (no LLM on repeat layouts) | S19 | AI | 1.5 | T1.4.4 |
 | T1.4.6 | T7 dataset model: versioned record sets per connection exposed as CM | S19, S24 | BE | 1 | T1.4.4 |
 | T1.4.7 | Scheduled re-discovery + CM diff trigger | S13 | BE | 1 | T1.5.2 |
 
-### E1.5 Semantics in production
+### E1.5 Canonical data in production
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T1.5.1 | CM Registry: versions, validation, operations/field indexes, query APIs | S24 | BE | 2.5 | T0.5.5 |
-| T1.5.2 | CM diff + change classification (additive/breaking/semantic) | S24 | BE | 1.5 | T1.5.1 |
-| T1.5.3 | Type library v1 for embedded finance (~150 types, ~20 models, state machines for Invoice, Payment) | S25 | DOM, TL | 3 | T0.5.3 |
-| T1.5.4 | Type Registry: compatibility checks, aliases, embeddings per type | S25 | BE | 1 | T0.5.4 |
-| T1.5.5 | Tagging service: production pipeline (candidates, ranking, LLM adjudication, calibration, thresholds) | S26 | AI | 3 | T0.5.11 |
-| T1.5.6 | Tagging: priors per known system; learning from confirmations | S26 | AI | 1.5 | T1.5.5 |
-| T1.5.7 | Resolver v1: production hardening (timeouts, partial results, unreachable errors, explain) | S27 | BE | 3 | T0.5.8 |
-| T1.5.8 | Resolver: consent filter integration | S27 | BE | 1 | T1.2.4 |
-| T1.5.9 | Resolver: cache with TTL per tier + invalidation on events | S27 | BE | 1 | T1.5.7 |
-| T1.5.10 | Resolver: collections, pagination, filters (`where` on dates, ranges) | S27 | BE | 1.5 | T1.5.7 |
-| T1.5.11 | Resolver: write planner with dry-run and idempotency (T1/T3) | S27 | BE | 2 | T1.5.7 |
-| T1.5.12 | Converter: currency with dated FX rates, units, time zones, enum maps; expression language v1 | S27 | BE | 2 | T0.5.8 |
+| T1.5.1 | CM Registry: versions, validation, operations/field indexes, query APIs | S24 | BE | 2.5 | T0.5.4 |
+| T1.5.2 | CM diff + change classification (additive/breaking/mapping-affecting) | S24 | BE | 1.5 | T1.5.1 |
+| T1.5.3 | Canonical model v1 for embedded finance (~20 entities, state machines for Invoice, Payment) | S25 | DOM, TL | 3 | T0.5.2 |
+| T1.5.4 | Canonical Model Registry: compatibility checks, embeddings per entity/field | S25 | BE | 1 | T0.5.3 |
+| T1.5.5 | Mapping service: production pipeline (candidates, agent proposals, confidence, thresholds, review items) | S26 | AI | 3 | T0.5.12 |
+| T1.5.6 | Mapping templates per known system; reuse across spokes; learning from confirmations | S26 | AI, IE | 2 | T1.5.5 |
+| T1.5.7 | CDS v1: production hardening (timeouts, fallbacks, clear unavailable-entity errors) | S27 | BE | 2.5 | T0.5.9 |
+| T1.5.8 | CDS: consent check integration | S27 | BE | 1 | T1.2.4 |
+| T1.5.9 | CDS: cache with TTL per tier + invalidation on events | S27 | BE | 1 | T1.5.7 |
+| T1.5.10 | CDS: filters, pagination, get by id across adapters | S27 | BE | 1.5 | T1.5.7 |
+| T1.5.11 | CDS: writes with reverse mapping, dry-run and idempotency (T1/T3) | S27 | BE | 2 | T1.5.7 |
+| T1.5.12 | Expression language v1 + conversions (dated FX rates, units, time zones, enum maps) | S27 | BE | 1.5 | T0.5.7 |
 
 ### E1.6 Integration runtime
 | ID | Task | Svc | Role | pw | Dep |
@@ -247,8 +248,8 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T1.7.1 | State Ledger: objects, transitions (append-only, partitioned, hash-chained), observations, APIs | S34 | GO | 3 | T0.2.5 |
-| T1.7.2 | State machine definitions from type library models; validation of transitions | S34 | GO | 1 | T1.5.3 |
-| T1.7.3 | Reconciler v1: scheduled jobs, cursoring, batch fetch via Resolver, compare with tolerance, breaks (missing, state, stale) | S36 | BE | 3 | T1.7.1, T1.5.7 |
+| T1.7.2 | State machine definitions from canonical model entities; validation of transitions | S34 | GO | 1 | T1.5.3 |
+| T1.7.3 | Reconciler v1: scheduled jobs, cursoring, batch fetch via CDS, compare with tolerance, breaks (missing, state, stale) | S36 | BE | 3 | T1.7.1, T1.5.7 |
 | T1.7.4 | Auto-heal (replay/resync) for allowed break types | S36 | BE | 1 | T1.7.3 |
 | T1.7.5 | Agreement score computation and API | S36 | BE | 1 | T1.7.3 |
 | T1.7.6 | Breaks & Cases: records, evidence, shared inbox, assignment, comments, resolution actions | S37 | BE | 2.5 | T1.7.3 |
@@ -256,10 +257,10 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 ### E1.8 Hub developer surface
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T1.8.1 | Hub Public API v1: spokes, invitations, connections, consents, query, write, explain, integrations, runs, objects, breaks, agreement | S45 | BE | 3 | many |
+| T1.8.1 | Hub Public API v1: spokes, invitations, connections, consents, canonical data (read/write, dry-run), integrations, runs, objects, breaks, agreement | S45 | BE | 3 | many |
 | T1.8.2 | Outbound webhooks: endpoints, signing, retries 72 h, delivery log, replay | S45 | BE | 1.5 | T1.8.1 |
-| T1.8.3 | SDKs: TypeScript and Python (generated + handwritten helpers for WQL) | S45 | BE | 1.5 | T1.8.1 |
-| T1.8.4 | Developer portal: guides, reference, events, WQL, type browser, sandbox keys | S48 | FE, PM | 2 | T1.8.1 |
+| T1.8.3 | SDKs: TypeScript and Python (generated + helpers for canonical data reads/writes) | S45 | BE | 1.5 | T1.8.1 |
+| T1.8.4 | Developer portal: guides, reference, events, canonical model browser, sandbox keys | S48 | FE, PM | 2 | T1.8.1 |
 
 ### E1.9 Experiences
 | ID | Task | Svc | Role | pw | Dep |
@@ -273,7 +274,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T1.9.7 | Console BFF: sessions, aggregation, SSE live updates | S46 | BE | 2 | T1.2.1 |
 | T1.9.8 | Hub Console: overview, spokes, connections, data products, integrations, runs/DLQ, breaks, webhooks, API keys, team | — | FE | 6 | T1.9.7 |
 | T1.9.9 | Spoke Portal: connections, hubs & consent, breaks involving me, Edge Agent status, team | — | FE | 3 | T1.9.7 |
-| T1.9.10 | Studio: tag review queue, discovery review, document review, tenants, type library viewer | — | FE | 3 | T1.9.7 |
+| T1.9.10 | Studio: mapping review queue, mapping templates, discovery review, document review, tenants, canonical model viewer | — | FE | 3 | T1.9.7 |
 | T1.9.11 | Notification service: email + WhatsApp templates, in-app inbox, preferences | S10 | BE | 2 | T0.2.6 |
 | T1.9.12 | Usability tests of Connect with 8 merchants; fixes | — | UX, FE | 1.5 | T1.9.6 |
 
@@ -281,18 +282,18 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T1.10.1 | Evaluation service: datasets, runs, metrics, CI regression gates | S42 | AI | 2 | T0.6.3 |
-| T1.10.2 | Golden datasets: tags (500+ fields), DB entity inference, Excel extraction (100 files) | — | IE, AI | 2 | T1.10.1 |
+| T1.10.2 | Golden datasets: mappings (500+ fields), DB entity inference, Excel extraction (100 files) | — | IE, AI | 2 | T1.10.1 |
 | T1.10.3 | Cost dashboards per tenant/agent; budgets | S40 | AI | 0.5 | T0.6.1 |
 
 ### E1.11 Billing (metering only)
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T1.11.1 | Metering: usage events from gateway, runtime, resolver, recon; daily aggregates; usage API | S11 | BE | 1.5 | T0.2.6 |
+| T1.11.1 | Metering: usage events from gateway, runtime, CDS, recon; daily aggregates; usage API | S11 | BE | 1.5 | T0.2.6 |
 
 ### E1.12 Security & launch
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T1.12.1 | Threat model (STRIDE) for Connect, Edge, Resolver, KMS | — | TL | 1 | — |
+| T1.12.1 | Threat model (STRIDE) for Connect, Edge, CDS, KMS | — | TL | 1 | — |
 | T1.12.2 | Security hardening checklist (ASVS L2) per service | — | TL, BE | 1.5 | T1.12.1 |
 | T1.12.3 | External pen test (web, API, Edge Agent); fix high/critical | — | TL | 2 | all |
 | T1.12.4 | Edge Agent security whitepaper for spoke IT (AR/EN) | — | TL, PM | 0.5 | T1.3.11 |
@@ -310,7 +311,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 - 3 integrations live where a side had no API (S2) and 1 where a side had no system (T8a).
 - Money Ledger live for payment status and settlements; orphan-money matching ≥ 90% auto.
 - Ops Agent proposals accepted ≥ 60%; MTTR for drift < 4 h.
-- ≥ 70% fields auto-tagged.
+- ≥ 70% fields auto-mapped.
 
 ### E2.1 Ladder completion
 | ID | Task | Svc | Role | pw | Dep |
@@ -329,7 +330,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T2.1.12 | Connector Runtime: GraphQL and SOAP adapters | S20 | BE | 1.5 | T2.1.11 |
 | T2.1.13 | Discovery: all tiers in orchestrator; tier upgrade detection + migration with recon check | S13 | BE | 2.5 | T1.4.1 |
 | T2.1.14 | Edge Agent: Oracle driver, file watcher (shared folders), CDC (log-based SQL Server/MySQL/Postgres + watermark polling) | S22 | GO | 4 | T1.3.8 |
-| T2.1.15 | CDC events → Orchestration triggers; Resolver cache invalidation | S31, S27 | BE | 1 | T2.1.14 |
+| T2.1.15 | CDC events → Orchestration triggers; CDS cache invalidation | S31, S27 | BE | 1 | T2.1.14 |
 | T2.1.16 | Connect UI: T2, T4, T5, T8a paths | S47 | FE | 3 | above |
 
 ### E2.2 API generation (S2)
@@ -360,14 +361,13 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T2.4.3 | Posting templates in specs (`ledger:` block) + Orchestration activity | S30, S31 | BE | 1.5 | T2.4.1 |
 | T2.4.4 | Reconciler: value_mismatch and orphan_money breaks; tolerances | S36 | BE | 2 | T1.7.3 |
 | T2.4.5 | Payment matching: rules engine (amount, date, reference parsing) + agent suggestions | S36 | AI, BE | 3 | T2.4.4 |
-| T2.4.6 | Resolver: conflict detection when two sources disagree → break | S27 | BE | 1 | T2.4.4 |
 | T2.4.7 | Bank statement ingestion (MT940/CAMT/CSV) as T6/T7 source | S21 | BE | 2 | — |
 
 ### E2.5 Automated operations
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T2.5.1 | Ops Agent: incident clustering from failures, DLQ, drift, breaks | S44 | AI | 2.5 | — |
-| T2.5.2 | Ops Agent: diagnosis using run history, CMs, lineage; proposals (re-tag, spec patch, conversion fix, re-auth) | S44 | AI | 3 | T2.5.1 |
+| T2.5.2 | Ops Agent: diagnosis using run history, CMs, mappings; proposals (re-map, spec patch, conversion fix, re-auth) | S44 | AI | 3 | T2.5.1 |
 | T2.5.3 | Studio: proposals review/approve, apply as change requests | — | FE | 1.5 | T2.5.2 |
 | T2.5.4 | Spec Service: auto-pause on breaking CM diff; resume + replay from pause point | S28, S32 | BE | 1.5 | T1.5.2 |
 | T2.5.5 | Incident timeline per integration (Hub Console) | — | FE | 1 | T2.5.1 |
@@ -377,13 +377,13 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T2.6.1 | Designer Agent: intent → spec draft + fixtures + explanation; iterate on validation | S29 | AI | 3 | T1.6.4 |
 | T2.6.2 | `code` step via Sandbox (TypeScript functions) | S31, S43 | BE | 1.5 | T2.1.3 |
-| T2.6.3 | CLI: `wasla spec push/test/diff`, `wasla types compile/publish` | — | BE | 1.5 | T1.6.2 |
+| T2.6.3 | CLI: `wasla spec push/test/diff`, `wasla cdm validate/publish` | — | BE | 1.5 | T1.6.2 |
 | T2.6.4 | Hub Console: spec editor with validation, diff, test report | — | FE | 2 | T1.6.9 |
 
 ### E2.7 Platform
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T2.7.1 | Search service: Arabic/English full text + vectors across tenant objects and types | S49 | BE | 2 | — |
+| T2.7.1 | Search service: Arabic/English full text + vectors across tenant objects and canonical entities | S49 | BE | 2 | — |
 | T2.7.2 | Evaluation datasets extended: docs, code ops, traffic, OCR, reply parsing | S42 | IE, AI | 2 | T1.10.1 |
 | T2.7.3 | Performance: partition maintenance, query tuning, load test to 5M runs/month | — | SRE, QA | 2 | — |
 | T2.7.4 | Hubs #2 and #3 onboarding; scale to 150 spokes | — | IE, PM | 4 | — |
@@ -444,8 +444,8 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 ### E3.5 Quality & scale
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T3.5.1 | Tagging improvements (active learning, per-vertical calibration); target ≥ 80% auto | S26 | AI | 3 | — |
-| T3.5.2 | Resolver: cost model learning from observed latencies/failures | S27 | BE | 1.5 | — |
+| T3.5.1 | Mapping improvements (active learning, template coverage); target ≥ 80% auto | S26 | AI | 3 | — |
+| T3.5.2 | CDS: automatic fallback ordering from observed latency/failures per connection | S27 | BE | 1 | — |
 | T3.5.3 | Chaos game days (tunnel loss, DB failover, broker loss) | — | SRE | 1 | — |
 | T3.5.4 | Load test to 20M runs/month, 2,000 agents | — | SRE, QA | 2 | — |
 | T3.5.5 | Hubs #4–#6 onboarding; scale to 1,000 spokes | — | IE, PM | 6 | — |
@@ -459,16 +459,16 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 **Exit criteria**
 - Micro-apps GA; ≥ 100 spokes using micro-apps.
 - Second vertical (decided by Month 12: retail/distribution buyer or logistics/3PL) live with ≥ 1 hub and ≥ 50 spokes.
-- 8 hubs; ≥ 5,000 spokes; ≥ 80% fields auto-tagged.
+- 8 hubs; ≥ 5,000 spokes; ≥ 80% fields auto-mapped.
 
 ### E4.1 Micro-app platform
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T4.1.1 | App model: selected models → screens (lists, forms, details, status boards), roles | S39 | BE | 3 | — |
-| T4.1.2 | Runtime: per-app schema storage, CRUD APIs, validation from types, audit | S39 | BE | 3 | T4.1.1 |
+| T4.1.2 | Runtime: per-app schema storage, CRUD APIs, validation from the canonical model, audit | S39 | BE | 3 | T4.1.1 |
 | T4.1.3 | PWA UI generator (mobile-first, AR/EN, offline drafts) | S39 | FE | 4 | T4.1.1 |
 | T4.1.4 | Import/export (Excel), bulk edit | S39 | FE, BE | 1.5 | T4.1.2 |
-| T4.1.5 | Auto-generated CM (T1) from app models; Resolver integration | S39, S24 | BE | 1.5 | T4.1.2 |
+| T4.1.5 | Auto-generated CM (T1) from app models; mappings generated automatically | S39, S24 | BE | 1.5 | T4.1.2 |
 | T4.1.6 | Upgrades on type-library changes (migrations) | S39 | BE | 1.5 | T4.1.2 |
 | T4.1.7 | Connect path: "activate a micro-app" | S47 | FE | 1 | T4.1.3 |
 | T4.1.8 | Micro-app billing add-on | S11 | BE | 0.5 | T3.4.1 |
@@ -477,10 +477,10 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T4.2.1 | Vertical discovery: interviews with 6 hubs, 15 spokes; data products | — | PM, DOM | 3 | — |
-| T4.2.2 | Type library v1 for the vertical (~150 types, state machines e.g. Order, Shipment, ASN, POD) | S25 | DOM, TL | 4 | T4.2.1 |
+| T4.2.2 | Canonical model v1 for the vertical (~20 entities, state machines e.g. Order, Shipment, ASN, POD) | S25 | DOM, TL | 4 | T4.2.1 |
 | T4.2.3 | Data-product templates for the vertical | S28 | BE, DOM | 2 | T4.2.2 |
 | T4.2.4 | Known-systems catalog extensions (WMS/TMS/POS as relevant) | S12 | IE | 3 | T4.2.1 |
-| T4.2.5 | Tagging priors and eval datasets for the vertical | S26, S42 | AI, IE | 2 | T4.2.2 |
+| T4.2.5 | Mapping templates and eval datasets for the vertical | S26, S42 | AI, IE | 2 | T4.2.2 |
 | T4.2.6 | Marketplace/external sources relevant to the vertical (T6) | S21 | BE | 2 | T4.2.1 |
 | T4.2.7 | Design partner hub onboarding in the vertical | — | IE, PM | 4 | above |
 
@@ -489,7 +489,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T4.3.1 | Self-hosted model option for sensitive tenants | S40 | AI, SRE | 3 | — |
 | T4.3.2 | Additional SDKs: Java, .NET, PHP | S45 | BE | 3 | — |
-| T4.3.3 | Resolver: subscriptions (push changes for a query) | S27 | BE | 3 | T2.1.15 |
+| T4.3.3 | CDS change feed: push changed canonical records to hubs | S27 | BE | 3 | T2.1.15 |
 | T4.3.4 | Multi-party integrations (> 2 parties, e.g. hub + spoke + bank) | S28, S34 | TL, BE | 3 | — |
 | T4.3.5 | Load test to 35M runs/month, 3,500 agents | — | SRE, QA | 1.5 | — |
 
@@ -512,7 +512,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T5.1.1 | Self-serve hub sign-up, sandbox auto-provisioning, guided first integration | S05, S47 | BE, FE | 3 | — |
 | T5.1.2 | Public known-systems directory & verified connector listings | S12 | FE, IE | 2 | — |
 | T5.1.3 | Partner program: implementation partners get Studio-lite access for their clients | S04, — | BE, FE | 3 | — |
-| T5.1.4 | Type library contributions workflow (partners propose types; review) | S25 | BE, FE | 2 | — |
+| T5.1.4 | Mapping-template contributions workflow (partners submit templates for new systems; review) | S25 | BE, FE | 2 | — |
 | T5.1.5 | Marketplace connectors (e-commerce platforms) as T6 | S21 | BE | 3 | — |
 
 ### E5.2 Scale
@@ -537,7 +537,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T5.4.1 | Accessibility audit and fixes (WCAG 2.1 AA) | — | FE, UX | 2 | — |
 | T5.4.2 | Advanced analytics for hubs (connection funnel, data freshness, tier mix) | — | FE, BE | 2 | — |
-| T5.4.3 | Agent quality push: tagging ≥ 85% auto, extraction ≥ 95% field accuracy | S26, S19 | AI | 4 | — |
+| T5.4.3 | Agent quality push: mapping ≥ 85% auto, extraction ≥ 95% field accuracy | S26, S19 | AI | 4 | — |
 | T5.4.4 | GA launch: pricing page, docs freeze, support playbooks, SLAs in contracts | — | PM | 2 | — |
 | T5.4.5 | Hubs #9–#10+ onboarding; scale to 20,000 spokes | — | IE, PM | 8 | — |
 
@@ -548,8 +548,8 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | Workstream | Activities | Owner |
 |---|---|---|
 | **Customer success** | Hub kickoff, spoke onboarding campaigns, white-glove for hard spokes, weekly reports to hubs | IE, PM |
-| **Golden data** | Every confirmed tag/extraction/fix flows (masked) into eval datasets | IE, AI |
-| **Reuse ratio** | Track engineer minutes per spoke and % auto-tagged; any repeated manual fix → template/rule/prior | TL, IE |
+| **Golden data** | Every confirmed mapping/extraction/fix flows (masked) into eval datasets | IE, AI |
+| **Reuse ratio** | Track engineer minutes per spoke and % auto-mapped; any repeated manual fix → mapping template or rule | TL, IE |
 | **Security** | Monthly review, dependency updates, secrets rotation, access reviews | SEC/TL |
 | **Docs** | ADRs, runbooks, API docs, spoke-facing help (AR/EN) | All |
 | **Cost** | Infra and LLM cost per spoke reviewed monthly | SRE, AI |

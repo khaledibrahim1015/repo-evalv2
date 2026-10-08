@@ -1,7 +1,7 @@
 # 01 — Product Requirements Document (PRD)
 
 *Version 2.0 · October 8, 2026 · Status: Draft for review*
-*Supersedes the build plan v1.1 and design revisions R1–R6 as the source of truth. Those documents remain as background.*
+*Supersedes the build plan v1.1 and design revisions R1–R5 as the source of truth. Those documents remain as background.*
 
 **Working name:** **Wasla** (وصلة, "connection"). Replace when branding is decided.
 
@@ -14,7 +14,7 @@ Wasla is a **generic B2B integration network**. It connects any company to any o
 It is sold to **hubs**, companies that must integrate with many counterparties (first: fintechs and embedded-finance providers in Egypt). The hub embeds Wasla's **Connect** experience; its **spokes** (merchants, suppliers, customers) connect once at whatever level they can. Wasla then:
 
 1. **Discovers** what each spoke's systems can do and describes it in one **Capability Model**.
-2. **Understands** every field through **semantic types**, so data from any source can be combined without per-pair mappings.
+2. **Maps** each spoke's data once to a **Canonical Data Model** per vertical, so every hub reads the same entities whatever the spoke's system.
 3. **Runs** integrations durably (retries, queues, idempotency, monitoring) on behalf of companies whose own infrastructure is weak.
 4. **Proves** that both parties agree, by tracking every shared object in a **State Ledger** and **reconciling** both sides continuously.
 
@@ -46,7 +46,7 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 | G2 | Fast onboarding | Median spoke time-to-connected < 1 day; median new hub integration live < 1 week |
 | G3 | Reliability | ≥99.9% platform availability; ≥99.5% integration run success after retries |
 | G4 | Agreement | ≥99% agreement score on reconciled entities |
-| G5 | Low marginal cost | ≥80% of fields auto-tagged above threshold; human effort per new spoke < 30 min |
+| G5 | Low marginal cost | ≥80% of fields auto-mapped above threshold; human effort per new spoke < 30 min |
 | G6 | Network effect | ≥30% of new hub–spoke connections reuse an existing spoke connection |
 | G7 | Commercial | 10+ paying hubs, 2 countries (Egypt, KSA), 2 verticals |
 
@@ -64,13 +64,13 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 | Persona | Organization | Needs |
 |---|---|---|
 | **Hub Product/Ops Manager** ("Mona") | Fintech | Get merchants connected fast; see who is connected, at which tier, and whether data is trustworthy |
-| **Hub Developer** ("Karim") | Fintech | One API and webhooks; embed Connect; query merchant data by meaning; no per-merchant code |
-| **Hub Risk/Finance Analyst** ("Heba") | Fintech | Reliable data with lineage; reconciliation reports; proof of agreement for audit |
+| **Hub Developer** ("Karim") | Fintech | One API and webhooks; embed Connect; read merchant data as canonical entities; no per-merchant code |
+| **Hub Risk/Finance Analyst** ("Heba") | Fintech | Reliable data with source information; reconciliation reports; proof of agreement for audit |
 | **Spoke Owner / Accountant** ("Ahmed") | SMB merchant / supplier | Connect in minutes without IT; understand and control what is shared; few manual tasks |
 | **Spoke IT person** ("Sara") | Mid-size company | Install the Edge Agent safely; read-only access; clear security story |
 | **Integration Engineer** ("Omar") | Wasla | Review agent output, fix low-confidence items, onboard difficult spokes |
 | **Platform Operator / SRE** ("Youssef") | Wasla | Keep the runtime healthy; tenant-level visibility; incident tooling |
-| **Wasla Admin** | Wasla | Manage tenants, plans, regions, country packs, type libraries |
+| **Wasla Admin** | Wasla | Manage tenants, plans, regions, country packs, canonical models |
 
 ---
 
@@ -84,9 +84,9 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 | **Connection** | Credential-bearing link from Wasla to one party's system or channel |
 | **Connectivity Ladder** | Ordered methods to reach a system: T1 API → T2 docs → T3 DB → T4 code → T5 UI traffic → T6 shared external source → T7 documents → T8 human/micro-app |
 | **Capability Model (CM)** | Normalized description of what a party's systems can do: entities, fields, operations, events, auth, limits, tier, provenance, confidence |
-| **Semantic Type** | Named meaning of a value (e.g. `TaxRegistrationNumber`), authored in the Taxi language, organized in per-vertical libraries |
-| **Tag** | Assignment of a semantic type to a CM field, with confidence and provenance |
-| **Resolver** | Engine that answers `find`/`write` requests by semantic type, planning calls across connections |
+| **Canonical Data Model (CDM)** | Per-vertical set of entities (e.g. MerchantProfile, Customer, Invoice, Payment) with fields, validation rules and state machines, defined in JSON Schema |
+| **Mapping** | Per connection and entity: which source operation supplies the entity and how source fields convert to canonical fields; produced by the mapping agent with confidence |
+| **Canonical Data Service (CDS)** | Service that reads and writes canonical entities for a party, using the mapped source operation of the selected connection |
 | **Integration Spec (IS)** | Declarative definition of one integration: trigger, steps, reliability, SLA, reconciliation |
 | **Run** | One execution of an Integration Spec |
 | **State Ledger** | Append-only record of every cross-party object, its state machine and each party's observed view |
@@ -97,14 +97,14 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 | **Country Pack** | Region config: residency, tax schema, e-invoicing connector, currency, language, holidays |
 | **Edge Agent** | Wasla-built agent installed in a party's network, outbound-only tunnel |
 | **Human Task** | Request to a person (form, email, WhatsApp) used as an API at tier T8a |
-| **Micro-app** | Generated small app over canonical types for parties with no system (T8b) |
+| **Micro-app** | Generated small app over canonical entities for parties with no system (T8b) |
 
 ---
 
 ## 6. Key user journeys
 
 ### J1 — Hub onboarding
-1. Wasla admin creates the hub tenant, picks country pack (Egypt) and vertical type library (embedded finance).
+1. Wasla admin creates the hub tenant, picks country pack (Egypt) and vertical canonical model (embedded finance).
 2. Hub admin signs in, invites team, sets roles.
 3. Hub developer gets API keys, configures webhook endpoints, embeds `connect.js` or uses hosted connect links.
 4. Hub selects which **data products** it needs (e.g. *Merchant Profile*, *Sales History*, *Issued E-Invoices*, *Bank Lines*, *Payment Status write-back*).
@@ -127,10 +127,10 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 6. Low-confidence items go to Wasla's review queue; spoke is asked only plain-language questions.
 7. Connection becomes **ready**; hub gets `connection.ready` webhook.
 
-### J3 — Hub queries data by meaning
-1. Hub developer calls `POST /v1/query` with `find MerchantProfile where MerchantId = X as [...]`.
-2. Resolver plans across the spoke's connections, executes, returns values with lineage.
-3. If a requested type is unreachable, response lists missing capabilities; Discovery may ask the spoke for more.
+### J3 — Hub reads canonical data
+1. Hub developer calls `GET /v1/spokes/{id}/data/invoices?issued_from=2026-04-01`.
+2. CDS uses the connection mapped for `Invoice` (e.g. ETA for this spoke), calls it through the Connector Runtime, applies the mapping and returns canonical records with source metadata (connection, tier, fetched at).
+3. If no connection supplies the entity yet, the response says so; Discovery may ask the spoke for more (e.g. upload an export).
 
 ### J4 — Integration runs and is reconciled
 1. Trigger fires (webhook, schedule, CDC, human task reply).
@@ -141,7 +141,7 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 ### J5 — Schema drift
 1. Re-discovery detects a CM change (new/removed field, changed type).
 2. Affected integrations auto-pause if the change is breaking.
-3. Ops Agent proposes re-tags or spec changes; engineer approves; runs resume and replay from the pause point.
+3. Ops Agent proposes mapping or spec changes; engineer approves; runs resume and replay from the pause point.
 
 ### J6 — Human-as-API
 1. Spec needs data a spoke can only provide manually (e.g. confirm delivery date).
@@ -150,8 +150,8 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 4. Run continues.
 
 ### J7 — Write-back
-1. Hub posts a payment status (`write PaymentStatus`).
-2. Resolver picks the target operation on the spoke system (API, DB via Edge Agent, generated API, or human task).
+1. Hub posts a payment status (`POST /v1/spokes/{id}/data/payments`).
+2. CDS uses the write mapping for `Payment` and picks the target operation on the spoke system (API, DB via Edge Agent, generated API, or human task).
 3. Dry-run preview → approval policy → idempotent write → reconciled.
 
 ### J8 — Spoke reuses connection for a second hub
@@ -179,7 +179,7 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 ### 7.2 Consent
 | ID | Requirement | P |
 |---|---|---|
-| FR-CO-01 | Consent request with hub identity, purpose, scopes (semantic types/data products), duration | P0 |
+| FR-CO-01 | Consent request with hub identity, purpose, scopes (data products / canonical entities), duration | P0 |
 | FR-CO-02 | Spoke can view, narrow, and revoke consent; revocation takes effect < 1 min | P0 |
 | FR-CO-03 | Every data access checks consent; denied access logged | P0 |
 | FR-CO-04 | Consent receipts (signed PDF/JSON) downloadable by both parties | P1 |
@@ -224,39 +224,37 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | FR-DI-10 | Scheduled re-discovery, CM diff, breaking-change classification | P0 |
 | FR-DI-11 | Automatic tier upgrade when a better path appears, with reconciliation check | P1 |
 
-### 7.6 Capability Model and semantic types
+### 7.6 Capability Model, canonical model and mapping
 | ID | Requirement | P |
 |---|---|---|
 | FR-CM-01 | CM stored as versioned documents (OpenAPI 3.1 + Wasla extensions) per connection | P0 |
 | FR-CM-02 | CM diff between versions with change classification | P0 |
-| FR-CM-03 | Semantic type libraries per vertical, authored in Taxi, versioned, compiled to registry JSON | P0 |
-| FR-CM-04 | Embedded-finance library v1 (~150 types, ~20 models) | P0 (v0 ~40 types) / P1 (v1) |
-| FR-CM-05 | Tagging agent assigns types to fields with confidence; threshold configurable | P0 |
-| FR-CM-06 | Review UI for low-confidence tags; bulk accept; learn from corrections | P0 |
-| FR-CM-07 | Semantic search over types and fields | P1 |
-| FR-CM-08 | Second vertical library (retail/distribution or logistics) | P2 |
+| FR-CM-03 | Canonical Data Model per vertical in JSON Schema: entities, fields, validation, state machines; versioned | P0 |
+| FR-CM-04 | Embedded-finance CDM v1 (~20 entities) | P0 (v0 ~8 entities) / P1 (v1) |
+| FR-CM-05 | Mapping agent maps each connection's entities/fields to canonical entities with confidence; threshold configurable | P0 |
+| FR-CM-06 | Review UI for low-confidence mappings; bulk accept; learn from corrections | P0 |
+| FR-CM-07 | Mapping templates per known system (reused across all spokes on that system) | P0 |
+| FR-CM-08 | Second vertical CDM (retail/distribution or logistics) | P2 |
 
-### 7.7 Resolver (query and write by meaning)
+### 7.7 Canonical Data Service (read and write canonical entities)
 | ID | Requirement | P |
 |---|---|---|
-| FR-RS-01 | `find <Model|Type> where {...} as [...]` over one party's connections | P0 |
-| FR-RS-02 | Multi-hop planning across connections and conversions | P0 |
-| FR-RS-03 | Cost model by tier, latency, rate-limit pressure; consent filtering | P0 |
-| FR-RS-04 | Lineage per returned value (source, operation, tier, confidence, time) | P0 |
-| FR-RS-05 | Unreachable-type errors listing missing capabilities | P0 |
-| FR-RS-06 | Plan explain (`/query/explain`) | P0 |
-| FR-RS-07 | `write <Model> with {...}`: target selection, dry-run, idempotency | P0 (dry-run, T1/T3) / P1 (all tiers) |
-| FR-RS-08 | Caching per (connection, operation, inputs) with TTL per tier | P0 |
-| FR-RS-09 | Collections and pagination (`find Invoice[] where IssueDate >= ...`) | P0 |
-| FR-RS-10 | Conflict detection when two sources disagree → break | P1 |
+| FR-DS-01 | Read canonical entities per spoke: list with filters, pagination, get by id | P0 |
+| FR-DS-02 | Per entity, use the connection selected by Discovery; ordered fallback connections when the primary is down | P0 |
+| FR-DS-03 | Consent check on every read/write | P0 |
+| FR-DS-04 | Source metadata on every record (connection, tier, fetched at, confidence for T7/T8) | P0 |
+| FR-DS-05 | Clear error when no connection supplies an entity | P0 |
+| FR-DS-06 | Write canonical entities: reverse mapping, target operation, dry-run, idempotency | P0 (dry-run, T1/T3) / P1 (all tiers) |
+| FR-DS-07 | Caching per (connection, entity, filters) with TTL per tier | P0 |
+| FR-DS-08 | Change feed: push changed canonical records to hubs | P2 |
 
 ### 7.8 Integration Specs and runtime
 | ID | Requirement | P |
 |---|---|---|
-| FR-IS-01 | Integration Spec YAML: trigger, steps (`find`, `write`, `map`, `call`, `human`, `code`), reliability, SLA, reconciliation | P0 |
+| FR-IS-01 | Integration Spec YAML: trigger, steps (`fetch`, `write`, `map`, `call`, `human`, `code`), reliability, SLA, reconciliation | P0 |
 | FR-IS-02 | Data-product templates generate specs for common hub needs | P0 |
 | FR-IS-03 | Integration designer agent: intent → spec draft | P1 |
-| FR-IS-04 | Spec validation against CMs and type registry; compile to workflow definitions | P0 |
+| FR-IS-04 | Spec validation against CMs, mappings and the canonical model; compile to workflow definitions | P0 |
 | FR-IS-05 | Two-party approval before production; versioning; rollback | P0 |
 | FR-IS-06 | Triggers: webhook, schedule, CDC, poll, human task reply, hub API call | P0 (webhook, schedule, poll, API) / P1 (CDC, human) |
 | FR-IS-07 | Reliability: retries with backoff, timeouts, DLQ, per-key ordering, idempotency, circuit breaker | P0 |
@@ -270,7 +268,7 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | FR-VE-01 | Mock servers generated from CMs | P0 |
 | FR-VE-02 | Contract tests between spec steps and CMs | P0 |
 | FR-VE-03 | Property-based/fuzz tests on generated APIs | P1 |
-| FR-VE-04 | Golden tests for conversions and tags from sample data | P0 |
+| FR-VE-04 | Golden tests for mappings from sample data | P0 |
 | FR-VE-05 | Go-live gate: tests green + both approvals + all low-confidence items confirmed | P0 |
 
 ### 7.10 State Ledger and reconciliation
@@ -322,24 +320,24 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | ID | Requirement | P |
 |---|---|---|
 | FR-OP-01 | Detect failure patterns and drift; auto-pause on breaking changes | P0 |
-| FR-OP-02 | Ops Agent diagnoses and proposes fixes as spec/tag change requests | P1 |
+| FR-OP-02 | Ops Agent diagnoses and proposes fixes as spec/mapping change requests | P1 |
 | FR-OP-03 | Incident timeline per integration | P1 |
 
 ### 7.16 Hub developer surface
 | ID | Requirement | P |
 |---|---|---|
-| FR-DX-01 | REST API v1: spokes, connections, consent, query, write, integrations, runs, breaks | P0 |
+| FR-DX-01 | REST API v1: spokes, connections, consent, canonical data (read/write), integrations, runs, breaks | P0 |
 | FR-DX-02 | Signed webhooks with retries and replay; event catalog | P0 |
 | FR-DX-03 | SDKs: TypeScript, Python; later Java, .NET, PHP | P0 (TS, Python) / P2 (others) |
 | FR-DX-04 | Developer docs portal with guides, API reference, sandbox | P0 |
-| FR-DX-05 | CLI for specs and type libraries (`wasla spec push`, `wasla types compile`) | P1 |
+| FR-DX-05 | CLI for specs and canonical models (`wasla spec push`, `wasla cdm publish`) | P1 |
 
 ### 7.17 Consoles
 | ID | Requirement | P |
 |---|---|---|
 | FR-UI-01 | **Hub Console**: spokes list with tier/status/agreement, integrations, runs, breaks, consent, API keys, webhooks, team, billing | P0 |
 | FR-UI-02 | **Spoke Portal**: my connections, hubs with access, consent management, tasks, breaks visible to me | P0 |
-| FR-UI-03 | **Wasla Studio** (internal): review queues (tags, discovery, docs), tenants, type libraries, country packs, agent evals, support tools | P0 |
+| FR-UI-03 | **Wasla Studio** (internal): review queues (mappings, discovery, docs), tenants, canonical models, country packs, agent evals, support tools | P0 |
 | FR-UI-04 | Arabic/English with RTL across all consoles | P0 |
 
 ### 7.18 Notifications, audit, billing
@@ -395,8 +393,8 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | Category | Metric |
 |---|---|
 | Adoption | Hubs live; spokes invited → connected conversion; connections by tier |
-| Speed | Time-to-connected per tier; time-to-first-query; time-to-go-live per integration |
-| Quality | Tagging precision/recall; % auto-tagged; discovery accuracy; resolver correctness |
+| Speed | Time-to-connected per tier; time-to-first-data-read; time-to-go-live per integration |
+| Quality | Mapping precision/recall; % auto-mapped; discovery accuracy; canonical data correctness |
 | Reliability | Run success rate; MTTD/MTTR; DLQ age; Edge Agent uptime |
 | Trust | Agreement score; open breaks; break age; auto-heal rate |
 | Efficiency | Engineer minutes per spoke; LLM cost per spoke; infra cost per run |
@@ -411,7 +409,7 @@ Detailed plan in [04-delivery-plan.md](04-delivery-plan.md).
 
 | Phase | Months | Theme | Exit |
 |---|---|---|---|
-| 0 | 0–1.5 | Foundations | Platform skeleton, type library v0, resolver prototype, design partners signed |
+| 0 | 0–1.5 | Foundations | Platform skeleton, canonical model v0, mapping prototype, design partners signed |
 | 1 | 1.5–5 | MVP: Egypt fintech hub | 1 hub, ≥20 spokes, ≥3 tiers, reconciliation live |
 | 2 | 5–9 | All ladder tiers | API generation, human tasks, Money Ledger, Ops Agent; 3 hubs |
 | 3 | 9–13 | Network & KSA | Connection reuse, proof of agreement, KSA region, SOC 2 Type I; 6 hubs |
@@ -433,7 +431,7 @@ Detailed plan in [04-delivery-plan.md](04-delivery-plan.md).
 | Spokes distrust installing an agent | Low T3 adoption | Read-only, outbound-only, open audit log, signed binaries, IT-friendly docs, hub endorsement |
 | Agent mistakes corrupt data | Severe | Read-only discovery, verification gate, dry-run, two-party approval, reconciliation |
 | Building everything in-house slows delivery | Schedule | Strict phase scope; commodity infra only where it is not product; reuse internal libraries |
-| Becoming a services company | Margin | Track engineer minutes per spoke; every manual fix must become a tag, template or rule |
+| Becoming a services company | Margin | Track engineer minutes per spoke; every manual fix must become a mapping template or rule |
 | Regulatory changes (fintech data rules) | Market | Legal counsel per country; consent and residency built in from day one |
 | UI-traffic (T5) breaks often | Reliability | Lowest preference among automated tiers; monitored; auto-fallback to T7/T8 |
 | LLM cost | Margin | Caching, small models for classification, batch processing |
