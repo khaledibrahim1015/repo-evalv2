@@ -32,6 +32,55 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 | P4 | Nobody can prove both sides agree; drift is found weeks later by accountants or customers | Finance, ops, risk teams |
 | P5 | Existing iPaaS products assume both sides are software companies with engineers | Underserved MENA SMB market |
 | P6 | Fintech onboarding stalls on "send us your data" for days or weeks | Fintech growth and risk teams |
+| P7 | Data must also flow back (payment status, settlements, decisions), which is hardest where merchants have no system | Fintechs, merchants |
+
+### 2.1 Reference scenario: an Egyptian fintech with 1,000 merchants
+
+A payments/lending fintech must exchange data with 1,000 merchants. Each merchant is in a different situation:
+
+```
+A  ERP with API                 Merchant ERP ──REST API──────────────▶ Fintech
+B  ERP, no API, DB reachable    Merchant ERP ── Database ── ? ───────▶ Fintech
+B2 Cloud ERP, no API, no DB     Web screens only ── ? ───────────────▶ Fintech
+C  Legacy on-prem system        Legacy app ── local SQL Server (behind firewall, no internet API)
+D  Excel                        Excel ── Email ──────────────────────▶ Fintech
+E  No system                    Paper / WhatsApp ── Employee ────────▶ Fintech
+F  Data held by third parties   ETA e-invoices · bank statements · POS/marketplaces · the fintech itself
+```
+
+**Two axes describe every merchant better than one list:**
+
+| Axis | Values |
+|---|---|
+| **Interface** | API · database · screens only (web UI) · files · nothing |
+| **Location** | Cloud and reachable · on-prem behind a firewall |
+
+**Case → method → ladder tier**
+
+| Case | Method | Tier |
+|---|---|---|
+| A — ERP with API | Call the API directly | T1 (T2 if only docs exist) |
+| B — ERP without API, DB reachable | Read the DB; generate an API from the DB or code | T3 / T4 |
+| B2 — Cloud ERP, no API, no DB access | Automate/analyze the web screens | T5 |
+| C — Legacy on-prem | Edge Agent inside the network + DB | T3 via Edge Agent |
+| D — Excel and email | Extract from files and inbox | T7 |
+| E — No system | WhatsApp/form tasks, or a micro-app | T8 |
+| F — Data held elsewhere | ETA, bank statements, POS/marketplaces, the fintech's own records | T6 |
+
+**What the scenario shows**
+1. **Mixed merchants.** One merchant can be several cases at once (sales in an ERP with API, stock in Excel, collections reported on WhatsApp). The method is chosen **per data type**, not per merchant.
+2. **Both directions.** Reading from merchants is half the problem. Writing back (payment status, settlements, financing decisions) is harder: C needs writes to a local DB, D has nowhere to write, E needs a human reply.
+3. **Connectivity is only one of four problems.**
+
+   | Problem | Meaning |
+   |---|---|
+   | Reach | Get to the data whatever the case (A–F) |
+   | Shape | Every system names things differently → map once to a canonical model |
+   | Trust | A is precise and real-time; D and E are late and error-prone → confidence scores and reconciliation |
+   | Cost per merchant | One week of work × 1,000 merchants = 1,000 weeks. The real problem is doing it 1,000 times at near-zero marginal cost |
+4. **The easy case is likely the minority.** Among Egyptian SMB merchants, A is probably rare and D/E common. This is an assumption to verify with a survey of design-partner merchants (see delivery plan T0.1.2); if confirmed, D, E and F matter more than A in the MVP.
+
+**Problem in one sentence:** a fintech must exchange data in both directions with thousands of merchants, each with a different system or none at all, reliably and at near-zero cost per merchant.
 
 ---
 

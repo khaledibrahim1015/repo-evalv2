@@ -75,7 +75,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T0.1.1 | Interview 8–10 fintechs (lenders, BNPL, collections); document data needs per use case | — | PM, DOM | 3 | — |
-| T0.1.2 | Interview 15 merchants of different sizes; catalog systems used (ERP, Excel, none) | — | PM, UX | 2 | — |
+| T0.1.2 | Interview 15 merchants and survey design-partner merchants; classify each by case A–F (PRD §2.1) and per data type; measure the real distribution | — | PM, UX | 2 | — |
 | T0.1.3 | Define MVP data products: Merchant Profile, Sales History, Issued E-Invoices, Customers, Payment Status write-back | — | PM, DOM | 1 | T0.1.1 |
 | T0.1.4 | Sign design-partner agreements (scope, data processing addendum, success criteria) | — | PM | 2 | T0.1.1 |
 | T0.1.5 | Pricing hypothesis validation with 5 hubs | — | PM | 1 | T0.1.1 |
