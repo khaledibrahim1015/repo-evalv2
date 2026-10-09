@@ -39,7 +39,7 @@ Any new decision: use the `record-decision` workflow (§7) so docs, ADRs and the
 ## 4. Repository layout
 
 ```
-AGENTS.md, CLAUDE.md        agent instructions
+AGENTS.md, CLAUDE.md        agent instructions (HANDBOOK.md: human guide)
 integration/prd/            PRD, architecture, services, delivery plan, tech stack (source of truth)
 progress/                   STATUS.md, tasks.json (generated), sessions/ (one log per session)
 tools/progress/tasks.py     task tracker (stdlib Python)

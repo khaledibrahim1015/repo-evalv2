@@ -25,6 +25,6 @@
 - Product name (working name: Wasla).
 
 ## Key references
-- Instructions: AGENTS.md, CLAUDE.md
+- Instructions: AGENTS.md, CLAUDE.md · Human guide: HANDBOOK.md
 - Docs: integration/prd/README.md
 - Latest session log: progress/sessions/2026-10-09-planning.md
