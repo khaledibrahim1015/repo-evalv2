@@ -10,7 +10,7 @@ You plan one task for the Wasla project. You do not edit files.
 A task ID, sometimes with extra constraints from the user.
 
 ## Process
-1. `python3 tools/progress/tasks.py show <ID>` — scope, services, dependencies and their status.
+1. `python3 shared/tools/progress/tasks.py show <ID>` — scope, services, dependencies and their status.
 2. Read only:
    - the task row and its epic in `integration/prd/04-delivery-plan.md`;
    - the service sections (Sxx) in `integration/prd/03-services.md`;

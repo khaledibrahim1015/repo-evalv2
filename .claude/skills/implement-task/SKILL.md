@@ -7,8 +7,8 @@ description: Implement one task from the Wasla delivery plan (IDs like T0.2.1, T
 
 ## 1. Load the task (small context)
 ```
-python3 tools/progress/tasks.py show <ID>
-python3 tools/progress/tasks.py start <ID>
+python3 shared/tools/progress/tasks.py show <ID>
+python3 shared/tools/progress/tasks.py start <ID>
 ```
 - Dependencies not done? Stop and tell the user which ones; do not build on missing foundations.
 - Read the task row and its epic in `integration/prd/04-delivery-plan.md` (`grep -n "<ID>"`, then read that epic only).
@@ -36,7 +36,7 @@ python3 tools/progress/tasks.py start <ID>
 
 ## 5. Record
 ```
-python3 tools/progress/tasks.py done <ID> --note "<what was built, key files, follow-ups>"
+python3 shared/tools/progress/tasks.py done <ID> --note "<what was built, key files, follow-ups>"
 ```
 - Partial work: `tasks.py note <ID> --note "..."` and keep it `in_progress`.
 - Blocked: `tasks.py block <ID> --note "<reason, what is needed>"`.

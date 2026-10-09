@@ -3,9 +3,9 @@
 # Claude Code specifics
 
 ## Automatic behavior (hooks in `.claude/settings.json`)
-- **SessionStart** (startup, resume, /clear, compaction): prints branch, recent commits, `progress/STATUS.md`, tracker brief and the "Next" section of the last session log. Treat it as the starting state.
-- **Stop**: if code changed after the last `progress/` update, the stop is blocked once with a request to run `handoff`. Do it; don't argue with it.
-- **PreToolUse (Edit/Write)**: blocks edits to `.env*` (except examples), key/cert files, `secrets/`, and `progress/tasks.json` (use `tools/progress/tasks.py`).
+- **SessionStart** (startup, resume, /clear, compaction): prints branch, recent commits, `shared/progress/STATUS.md`, tracker brief and the "Next" section of the last session log. Treat it as the starting state.
+- **Stop**: if code changed after the last `shared/progress/` update, the stop is blocked once with a request to run `handoff`. Do it; don't argue with it.
+- **PreToolUse (Edit/Write)**: blocks edits to `.env*` (except examples), key/cert files, `secrets/`, and `shared/progress/tasks.json` (use `shared/tools/progress/tasks.py`).
 
 ## Skills (`.claude/skills/`)
 | Skill | Use when |

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop hook: if code changed since progress/ was last updated, block the stop once
+"""Stop hook: if code changed since shared/progress/ was last updated, block the stop once
 and ask Claude to run the `handoff` skill. Never blocks twice in a row."""
 import json
 import os
@@ -23,13 +23,13 @@ except Exception:
 if payload.get("stop_hook_active"):
     sys.exit(0)
 
-IGNORED = ("progress/",)
+IGNORED = ("shared/progress/",)
 dirty = [line[3:] for line in git("status", "--porcelain").splitlines() if len(line) > 3]
 dirty_code = [p for p in dirty if not p.startswith(IGNORED)]
-dirty_progress = [p for p in dirty if p.startswith("progress/")]
+dirty_progress = [p for p in dirty if p.startswith("shared/progress/")]
 
-last_progress = int(git("log", "-1", "--format=%ct", "--", "progress") or 0)
-last_code = int(git("log", "-1", "--format=%ct", "--", ".", ":(exclude)progress") or 0)
+last_progress = int(git("log", "-1", "--format=%ct", "--", "shared/progress") or 0)
+last_code = int(git("log", "-1", "--format=%ct", "--", ".", ":(exclude)shared/progress") or 0)
 committed_unrecorded = last_code > last_progress
 
 if dirty_progress:
@@ -37,13 +37,13 @@ if dirty_progress:
 if dirty_code or committed_unrecorded:
     reason = []
     if dirty_code:
-        reason.append(f"{len(dirty_code)} uncommitted file(s) outside progress/")
+        reason.append(f"{len(dirty_code)} uncommitted file(s) outside shared/progress/")
     if committed_unrecorded:
-        reason.append("commits after the last progress/ update")
+        reason.append("commits after the last shared/progress/ update")
     print(
         "Progress is not recorded (" + "; ".join(reason) + "). Before stopping, run the `handoff` skill: "
-        "update task statuses with tools/progress/tasks.py, update progress/STATUS.md, write a session log in "
-        "progress/sessions/, and commit. If this turn changed nothing worth recording, add one line to the "
+        "update task statuses with shared/tools/progress/tasks.py, update shared/progress/STATUS.md, write a session log in "
+        "shared/progress/sessions/, and commit. If this turn changed nothing worth recording, add one line to the "
         "latest session log saying so and commit it.",
         file=sys.stderr,
     )

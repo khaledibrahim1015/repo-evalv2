@@ -10,9 +10,9 @@ The next session knows only what is in the repository. Write it down.
 ## Steps
 
 1. **Tracker** — every task touched this session has the right status:
-   `python3 tools/progress/tasks.py done|note|block <ID> --note "..."`.
+   `python3 shared/tools/progress/tasks.py done|note|block <ID> --note "..."`.
 
-2. **Session log** — create or update `progress/sessions/YYYY-MM-DD-<short-topic>.md` (date in UTC) using this template:
+2. **Session log** — create or update `shared/progress/sessions/YYYY-MM-DD-<short-topic>.md` (date in UTC) using this template:
    ```markdown
    # <date> — <topic>
 
@@ -31,11 +31,11 @@ The next session knows only what is in the repository. Write it down.
    ```
    Keep it short and factual. The "Next" section is printed automatically at the next session start.
 
-3. **STATUS.md** — update `progress/STATUS.md` (keep under ~60 lines): current phase, task in progress, last completed tasks, open blockers, open questions for the user, pointer to the latest session log. Remove stale lines instead of appending forever.
+3. **STATUS.md** — update `shared/progress/STATUS.md` (keep under ~60 lines): current phase, task in progress, last completed tasks, open blockers, open questions for the user, pointer to the latest session log. Remove stale lines instead of appending forever.
 
 4. **Docs** — if behavior or decisions changed and docs are not yet updated, do it now (or run `record-decision`).
 
-5. **Commit** — `git add progress/ <other changed files>` and commit: `progress: <summary>` (or include it in the last task commit). Push only if the user or environment asks for it.
+5. **Commit** — `git add shared/progress/ <other changed files>` and commit: `progress: <summary>` (or include it in the last task commit). Push only if the user or environment asks for it.
 
 6. **Tell the user** in two or three lines: what was done, what is next, anything they must decide or do (e.g., human tasks).
 

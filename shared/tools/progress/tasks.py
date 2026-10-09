@@ -2,7 +2,7 @@
 """Task tracker for the Wasla delivery plan.
 
 Source of tasks: integration/prd/04-delivery-plan.md (tables with rows "| T<phase>.<epic>.<n> | ...").
-State:           progress/tasks.json (statuses and notes; never edit by hand, use this script).
+State:           shared/progress/tasks.json (statuses and notes; never edit by hand, use this script).
 
 Usage:
   tasks.py sync                      Re-read the plan, add/update tasks, keep statuses and notes
@@ -32,9 +32,9 @@ import signal
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 PLAN = ROOT / "integration" / "prd" / "04-delivery-plan.md"
-STATE = ROOT / "progress" / "tasks.json"
+STATE = ROOT / "shared" / "progress" / "tasks.json"
 
 TASK_ROW = re.compile(r"^\|\s*(T\d+\.\d+\.\d+)\s*\|(.*)\|\s*$")
 PHASE_HDR = re.compile(r"^##\s+\d+\.\s+Phase\s+(\d+)\s+—\s+(.*)$")
@@ -178,7 +178,7 @@ def fmt(t: dict) -> str:
 def cmd_brief(_args) -> None:
     state = load_state()
     if not state["tasks"]:
-        print("No tasks tracked yet. Run: python3 tools/progress/tasks.py sync")
+        print("No tasks tracked yet. Run: python3 shared/tools/progress/tasks.py sync")
         return
     tasks = state["tasks"].values()
     phase = current_phase(state)

@@ -40,7 +40,7 @@
   },
   "permissions": {
     "allow": [
-      "Bash(python3 tools/progress/tasks.py *)",
+      "Bash(python3 shared/tools/progress/tasks.py *)",
       "Bash(git status *)",
       "Bash(git log *)",
       "Bash(git diff *)"

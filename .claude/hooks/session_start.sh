@@ -11,19 +11,19 @@ echo
 echo "--- Recent commits ---"
 git log --oneline -5 2>/dev/null
 echo
-if [ -f progress/STATUS.md ]; then
-  echo "--- progress/STATUS.md ---"
-  head -n 60 progress/STATUS.md
+if [ -f shared/progress/STATUS.md ]; then
+  echo "--- shared/progress/STATUS.md ---"
+  head -n 60 shared/progress/STATUS.md
   echo
 fi
 echo "--- Task tracker ---"
-python3 tools/progress/tasks.py brief 2>/dev/null || echo "(tracker unavailable: run python3 tools/progress/tasks.py sync)"
+python3 shared/tools/progress/tasks.py brief 2>/dev/null || echo "(tracker unavailable: run python3 shared/tools/progress/tasks.py sync)"
 echo
-LAST_LOG=$(ls -1 progress/sessions/*.md 2>/dev/null | grep -v README | sort | tail -n 1)
+LAST_LOG=$(ls -1 shared/progress/sessions/*.md 2>/dev/null | grep -v README | sort | tail -n 1)
 if [ -n "${LAST_LOG:-}" ]; then
   echo "--- Last session log: $LAST_LOG (section 'Next') ---"
   awk '/^## Next/{f=1;next} /^## /{f=0} f' "$LAST_LOG" | head -n 20
   echo
 fi
-echo "Start with the 'resume' skill. Source of truth: AGENTS.md -> integration/prd/*.md -> progress/."
+echo "Start with the 'resume' skill. Source of truth: AGENTS.md -> integration/prd/*.md -> shared/progress/."
 exit 0

@@ -1,6 +1,6 @@
 ---
 name: spec-guardian
-description: Knows where things are in the Wasla docs (integration/prd/*, AGENTS.md, progress/). Answers "what do the docs say about X" with exact file/section references, and checks a proposed change or diff for conflicts with the PRD, architecture, ADRs, tech stack and priorities. Read-only. Use to keep large doc reads out of the main context.
+description: Knows where things are in the Wasla docs (integration/prd/*, AGENTS.md, shared/progress/). Answers "what do the docs say about X" with exact file/section references, and checks a proposed change or diff for conflicts with the PRD, architecture, ADRs, tech stack and priorities. Read-only. Use to keep large doc reads out of the main context.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -13,7 +13,7 @@ Documents (source of truth, in this priority):
 - `integration/prd/01-prd.md` — requirements (§7, with P0/P1/P2/Deferred) and priority order (§2.2).
 - `integration/prd/03-services.md` — service responsibilities and phases.
 - `integration/prd/04-delivery-plan.md` — tasks, phases, exit criteria, deferred backlog (§8).
-- `progress/` — current state and session history.
+- `shared/progress/` — current state and session history.
 Files in `integration/` outside `prd/` are background and superseded.
 
 ## When asked a question

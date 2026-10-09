@@ -1,6 +1,6 @@
 # Project status
 
-*Updated: 2026-10-09 · Keep under ~60 lines. Detail goes in progress/sessions/.*
+*Updated: 2026-10-09 · Keep under ~60 lines. Detail goes in shared/progress/sessions/.*
 
 ## Phase
 **Phase 0 — Foundations** (not started in code). Planning and design pack are complete.
@@ -8,7 +8,7 @@
 ## In progress
 - None.
 
-## Next engineering tasks (see `python3 tools/progress/tasks.py next`)
+## Next engineering tasks (see `python3 shared/tools/progress/tasks.py next`)
 1. T0.2.1 — Monorepo setup (modular-monolith layout, TS/Py/Go tooling, boundary lint, Taskfile)
 2. T0.5.1 — Canonical model format (JSON Schema conventions)
 3. T0.5.4 — Capability Model schema v0
@@ -27,4 +27,4 @@
 ## Key references
 - Instructions: AGENTS.md, CLAUDE.md · Human guide: HANDBOOK.md
 - Docs: integration/prd/README.md
-- Latest session log: progress/sessions/2026-10-09-planning.md
+- Latest session log: shared/progress/sessions/2026-10-09-planning.md

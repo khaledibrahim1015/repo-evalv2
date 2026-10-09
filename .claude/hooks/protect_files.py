@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """PreToolUse hook (Edit|Write|MultiEdit|NotebookEdit): block edits to secrets and to the
-generated task state, which must change only through tools/progress/tasks.py."""
+generated task state, which must change only through shared/tools/progress/tasks.py."""
 import json
 import os
 import re
@@ -23,8 +23,8 @@ for pattern, cond, why in rules:
     if pattern.match(name) and cond(name):
         print(f"Blocked edit to {rel}: {why}.", file=sys.stderr)
         sys.exit(2)
-if rel.replace(os.sep, "/") in ("progress/tasks.json",):
-    print("Blocked: progress/tasks.json is managed by tools/progress/tasks.py "
+if rel.replace(os.sep, "/") in ("shared/progress/tasks.json",):
+    print("Blocked: shared/progress/tasks.json is managed by shared/tools/progress/tasks.py "
           "(use sync/start/done/block/external/note).", file=sys.stderr)
     sys.exit(2)
 if rel.replace(os.sep, "/").startswith("secrets/"):

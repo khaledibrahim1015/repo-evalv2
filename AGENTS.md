@@ -12,8 +12,8 @@ Full product and engineering pack: `integration/prd/` (read the index in `integr
 
 | Need | Read |
 |---|---|
-| Current state, what to do next | `progress/STATUS.md`, `python3 tools/progress/tasks.py brief`, latest `progress/sessions/*.md` |
-| A task's scope, owner, dependencies | `python3 tools/progress/tasks.py show <ID>` → row in `integration/prd/04-delivery-plan.md` |
+| Current state, what to do next | `shared/progress/STATUS.md`, `python3 shared/tools/progress/tasks.py brief`, latest `shared/progress/sessions/*.md` |
+| A task's scope, owner, dependencies | `python3 shared/tools/progress/tasks.py show <ID>` → row in `integration/prd/04-delivery-plan.md` |
 | What a service/module must do | `integration/prd/03-services.md` (section S01–S50) |
 | How things fit together, flows, ADRs | `integration/prd/02-architecture.md` |
 | Technology, libraries, deployables, repo layout | `integration/prd/05-tech-stack.md` |
@@ -39,22 +39,23 @@ Any new decision: use the `record-decision` workflow (§7) so docs, ADRs and the
 ## 4. Repository layout
 
 ```
-AGENTS.md, CLAUDE.md        agent instructions (HANDBOOK.md: human guide)
-integration/prd/            PRD, architecture, services, delivery plan, tech stack (source of truth)
-progress/                   STATUS.md, tasks.json (generated), sessions/ (one log per session)
-tools/progress/tasks.py     task tracker (stdlib Python)
-.claude/                    Claude Code skills, agents, hooks, settings
-apps/ modules/ packages/    code (created from T0.2.1, layout in 05-tech-stack.md §13)
+AGENTS.md, CLAUDE.md                agent instructions (HANDBOOK.md: human guide)
+integration/prd/                    PRD, architecture, services, delivery plan, tech stack (source of truth)
+shared/                             project working state and tooling (not product code)
+  progress/                         STATUS.md, tasks.json (generated), sessions/ (one log per session), gates/
+  tools/progress/tasks.py           task tracker (stdlib Python)
+.claude/                            Claude Code skills, agents, hooks, settings
+apps/ modules/ packages/            product code (created from T0.2.1, layout in 05-tech-stack.md §13)
 canonical-models/ country-packs/ evals/ infra/ docs/
 ```
 
 ## 5. Working loop (every session)
 
-1. **Resume** — read the session-start context, `progress/STATUS.md`, the last session log; run `tasks.py brief`.
+1. **Resume** — read the session-start context, `shared/progress/STATUS.md`, the last session log; run `tasks.py brief`.
 2. **Pick one task** — the one in progress, else the first ready task from `tasks.py next`. One task per session is the default; small related tasks may be grouped.
 3. **Load only what the task needs** — `tasks.py show <ID>`, then the specific sections it points to. Do not read whole documents when a section will do.
 4. **Plan → implement → verify** — follow the definition of done (§6). Keep changes inside the module(s) the task names.
-5. **Record** — `tasks.py start/done/block/note`, update `progress/STATUS.md`, write the session log, commit.
+5. **Record** — `tasks.py start/done/block/note`, update `shared/progress/STATUS.md`, write the session log, commit.
 
 Human/business tasks (`kind: human`, e.g. interviews, legal review) are not done in code. Mark them `external` with a note when the user confirms they are done, or skip past them.
 
@@ -100,6 +101,6 @@ Human/business tasks (`kind: human`, e.g. interviews, legal review) are not done
 
 Available now:
 ```
-python3 tools/progress/tasks.py brief | next | show <ID> | start <ID> | done <ID> --note "..." | block <ID> --note "..." | external <ID> | sync
+python3 shared/tools/progress/tasks.py brief | next | show <ID> | start <ID> | done <ID> --note "..." | block <ID> --note "..." | external <ID> | sync
 ```
 Available after T0.2.1 (monorepo setup): `task dev`, `task build`, `task test`, `task lint` (see `05-tech-stack.md` §3 and §12). Until then, use each toolchain directly.

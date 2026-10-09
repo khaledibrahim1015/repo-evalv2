@@ -21,7 +21,7 @@ Decisions in this project change often. A decision is only real when every affec
 
 4. **ADR** — add or amend a row in `integration/prd/02-architecture.md` §15 (`ADR-0NN | decision and why`). Keep ADR numbers in order.
 
-5. **Tracker** — if `04-delivery-plan.md` changed: `python3 tools/progress/tasks.py sync` and check `tasks.py brief`. Tasks removed from the plan become `skipped` automatically.
+5. **Tracker** — if `04-delivery-plan.md` changed: `python3 shared/tools/progress/tasks.py sync` and check `tasks.py brief`. Tasks removed from the plan become `skipped` automatically.
 
 6. **AGENTS.md §3** — update the "decisions already made" list if the decision belongs there.
 

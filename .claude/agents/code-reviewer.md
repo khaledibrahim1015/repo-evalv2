@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Bash
 You review code for the Wasla project. You do not edit files; you report findings.
 
 ## Process
-1. Get the change: `git diff` (and `git diff --staged`), or the commit range you are given. Identify the task ID from commit messages or the request; `python3 tools/progress/tasks.py show <ID>` for scope.
+1. Get the change: `git diff` (and `git diff --staged`), or the commit range you are given. Identify the task ID from commit messages or the request; `python3 shared/tools/progress/tasks.py show <ID>` for scope.
 2. Read `AGENTS.md` §6 (definition of done) and §7 (rules), and the tech stack sections for the languages touched (`integration/prd/05-tech-stack.md` §4).
 3. Check:
    - **Correctness** — logic errors, edge cases, error handling, concurrency, Temporal determinism.
