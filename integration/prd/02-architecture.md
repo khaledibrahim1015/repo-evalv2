@@ -14,7 +14,7 @@
 6. **Tenant and region isolation first.** Tenant id and region are on every request, row, event, log line, and key.
 7. **Outbound-only into customer networks.** The Edge Agent dials out; Wasla never needs inbound firewall rules.
 8. **Events as the backbone.** Services communicate through commands (sync API) and domain events (async). Each service owns its data.
-9. **Built in-house, infrastructure as commodity.** Product logic is ours. We rely on commodity infrastructure only: PostgreSQL, Redis-compatible cache, object storage, Kubernetes, and a durable-workflow engine (Temporal). No message broker at the start: events flow through a Postgres event store (ADR-011). Each is wrapped behind an internal interface so it can be replaced.
+9. **Built in-house, infrastructure as commodity.** Product logic is ours. We rely on commodity infrastructure only: PostgreSQL, NATS JetStream (events), Redis-compatible cache, object storage, Kubernetes, and a durable-workflow engine (Temporal) (ADR-011). Each is wrapped behind an internal interface so it can be replaced.
 
 ---
 
@@ -136,7 +136,7 @@ flowchart TB
     DEV[Developer portal]
   end
 
-  BUS[(Event store - Postgres)]
+  BUS[(NATS JetStream)]
 
   UX --> GW --> Platform & Connectivity & Canonical & Integration & Agreement & Human
   WH --> BUS
@@ -161,7 +161,7 @@ Full specification of each service in [03-services.md](03-services.md).
 | # | Service | Domain | Lang | Store | Phase |
 |---|---|---|---|---|---|
 | S01 | API Gateway | Edge | Go | Redis | 0 |
-| S02 | Webhook Ingress | Edge | Go | Postgres event store, object store | 1 |
+| S02 | Webhook Ingress | Edge | Go | NATS JetStream, object store | 1 |
 | S03 | Tunnel Gateway | Edge | Go | Redis | 2 |
 | S04 | Identity & Access (IAM) | Platform | TS | Postgres | 0 |
 | S05 | Tenant & Party | Platform | TS | Postgres | 0 |
@@ -254,15 +254,15 @@ erDiagram
 | PostgreSQL (per region, HA, PITR) | All transactional data; JSONB for CMs/specs; partitioned tables for runs and ledger |
 | Vector index (pgvector-style column in Postgres) | Field/entity embeddings for mapping and search |
 | Object storage (S3-compatible, per region) | Raw ingested artifacts (specs, docs, HAR, uploads), run payloads (encrypted), exports |
-| Event store (Postgres) | Domain events, CDC events, webhook ingress buffer: append-only `events` table (partitioned by day) written via the transactional outbox; consumers read by cursor with `LISTEN/NOTIFY` wake-ups; per-consumer offsets table; retention policy. Replaced by a broker only when the triggers in ADR-011 are hit |
+| NATS JetStream (per region, 3-node cluster, file storage) | Domain events, CDC events, webhook ingress buffer. One stream per domain (`TENANT`, `CONSENT`, `CONNECTION`, `DISCOVERY`, `CM`, `MAPPING`, `SPEC`, `RUN`, `LEDGER`, `RECON`, `TASK`, `WEBHOOK`, `USAGE`, `AUDIT`), replicas = 3, retention by limits/age per stream; durable pull consumers per consuming module; dedup window via `Nats-Msg-Id` = `event_id`. Services write events to a Postgres outbox in the same transaction as their data; an outbox relay publishes to JetStream |
 | Redis-compatible cache | Rate limits, CDS cache, sessions, tunnel routing |
 | Temporal | Durable workflow state for discovery, runs, reconciliation, human tasks |
 | Git (internal) | Canonical models, spec history, generated code |
 
-### 4.4 Event catalog (event types)
-Naming: `<domain>.<entity>.<event>.v<N>`; key = `tenant_id:<entity_id>`; envelope includes `event_id`, `tenant_id`, `region`, `occurred_at`, `actor`, `trace_id`, `schema_version`.
+### 4.4 Event catalog (NATS subjects)
+Subject naming: `<region>.<domain>.<entity>.<event>.v<N>.<tenant_id>`; ordering key = `tenant_id:<entity_id>`; envelope includes `event_id`, `tenant_id`, `region`, `occurred_at`, `actor`, `trace_id`, `schema_version`.
 
-| Event type | Producer | Main consumers |
+| Subject (without region/tenant tokens) | Producer | Main consumers |
 |---|---|---|
 | `tenant.org.created/updated` | Tenant | IAM, Billing, Audit |
 | `tenant.hubspoke.linked/unlinked` | Tenant | Consent, Connect, Billing |
@@ -439,7 +439,7 @@ sequenceDiagram
 ## 9. Deployment architecture
 
 ### 9.1 Topology
-- **Region cell** = one Kubernetes cluster (3 AZs or 3 failure domains) + regional Postgres HA (including the event store) + object store + Temporal cluster + KMS. Egypt cell first; KSA cell in Phase 3.
+- **Region cell** = one Kubernetes cluster (3 AZs or 3 failure domains) + regional Postgres HA + NATS JetStream cluster + object store + Temporal cluster + KMS. Egypt cell first; KSA cell in Phase 3.
 - **Global control plane (minimal):** tenant directory (tenant → region routing), billing aggregation, Studio access, docs. Holds no customer business data.
 - **Cells for scale/enterprise:** a region can run multiple cells; tenants are assigned to a cell; dedicated cells for enterprise.
 
@@ -471,7 +471,7 @@ sequenceDiagram
 | `human` | Human Tasks, Micro-app Platform |
 | `ai` | LLM Gateway, Agent Runtime, Evaluation, Sandbox (isolated node pool), Ops Agent |
 | `ux` | Hub API, Console BFF, Connect Service, Developer Portal |
-| `infra` | Temporal, cache, observability |
+| `infra` | Temporal, NATS JetStream, cache, observability |
 
 ### 9.4 Delivery
 Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (desired state repo per environment) → progressive delivery (canary 5% → 25% → 100% with SLO-based automatic rollback). Database migrations: expand/contract, backward compatible for one release.
@@ -483,17 +483,17 @@ Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (de
 | Pattern | Where |
 |---|---|
 | Idempotency keys | All writes to parties; all API POSTs; ledger postings |
-| Transactional outbox | Every service publishing events from DB changes |
-| Inbox / dedup | Every event consumer (processed-event table) |
+| Transactional outbox | Every service publishing events from DB changes; outbox relay publishes to JetStream with `Nats-Msg-Id` for dedup |
+| Inbox / dedup | Every JetStream consumer (processed-event table); explicit ack, max deliver, backoff, DLQ subject per consumer |
 | Retries with exponential backoff + jitter | Connector Runtime, webhooks out, workflow activities |
 | Dead-letter + replay | Runs, webhook deliveries, event consumers |
 | Circuit breaker | Per connection and per upstream host |
 | Bulkheads | Per-tenant worker quotas; separate pools for agent workloads |
 | Back-pressure | Rate limits per connection; queue depth-based throttling |
-| Per-key ordering | Events ordered by a per-key sequence in the event store; one Temporal workflow per key where strict ordering is required |
+| Per-key ordering | JetStream preserves order per subject; consumers process per key with `max_ack_pending` tuned; one Temporal workflow per key where strict ordering is required |
 | Timeouts everywhere | Default budgets per call type |
 | Graceful degradation | CDS falls back to the next mapped connection; clear error when none is available |
-| Chaos testing | Monthly game days in staging (tunnel loss, DB failover, Temporal loss) |
+| Chaos testing | Monthly game days in staging (tunnel loss, DB failover, NATS node loss, Temporal loss) |
 
 ---
 
@@ -517,7 +517,7 @@ Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (de
 | Frontend | React + TypeScript, internal design system, i18n with RTL |
 | Workflows | Temporal (TS and Python SDKs), wrapped by internal `durable` library |
 | Database | PostgreSQL 16+ with partitioning, RLS, vector column type |
-| Events | Postgres event store (outbox + cursors + `LISTEN/NOTIFY`); broker deferred (ADR-011) |
+| Events | NATS JetStream (Postgres outbox → relay → JetStream; durable pull consumers) (ADR-011) |
 | Cache | Redis-compatible |
 | Object store | S3-compatible |
 | Infra | Kubernetes, Helm charts, GitOps controller, IaC |
@@ -587,4 +587,4 @@ wasla/
 | ADR-008 | Edge Agent in Go, outbound-only, signed commands |
 | ADR-009 | All agents behind LLM Gateway with mandatory PII Guard |
 | ADR-010 | Monorepo with shared service kits per language |
-| ADR-011 | No message broker at the start. Events go through a Postgres event store (outbox → `events` table → cursor-based consumers with `LISTEN/NOTIFY`); durable processing runs in Temporal. All producers/consumers use the `events` interface in the service kits, so a broker can replace the store without changing services. **Triggers to introduce a broker:** sustained > 2,000 events/s per cell, event-store load hurting transactional queries, need for long replay windows across many consumers, or high-volume CDC streams from Edge Agents |
+| ADR-011 | NATS JetStream is the event backbone from day one (not Kafka): light to operate, request/reply, accounts for tenant isolation, replay, and leaf nodes for edge connectivity. Postgres outbox + relay keeps publishing atomic with data changes; consumers are idempotent. Durable multi-step processing stays in Temporal. All producers/consumers use the `events` interface in the service kits |

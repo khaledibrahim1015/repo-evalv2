@@ -90,7 +90,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T0.2.3 | Service kit TS: config, logging, tracing, metrics, health, auth middleware, tenant context, errors (RFC 9457) | — | BE | 2 | T0.2.1 |
 | T0.2.4 | Service kit Python (same features) | — | AI | 1.5 | T0.2.1 |
 | T0.2.5 | Service kit Go (same features) | — | GO | 1.5 | T0.2.1 |
-| T0.2.6 | Event store + outbox/inbox libraries (TS, Py, Go): `events` table, cursors, `LISTEN/NOTIFY`, event envelope schema, broker-ready interface (ADR-011) | — | BE, GO | 2 | T0.2.3 |
+| T0.2.6 | Events libraries (TS, Py, Go): Postgres outbox + relay to JetStream, durable pull consumers, inbox/dedup, DLQ subjects, event envelope schema (ADR-011) | — | BE, GO | 2 | T0.2.3 |
 | T0.2.7 | Contracts package: OpenAPI/AsyncAPI layout, client generation | — | BE | 1 | T0.2.1 |
 | T0.2.8 | `durable` library: Temporal wrappers, activity conventions, retry presets | — | BE | 1.5 | T0.3.4 |
 | T0.2.9 | Policy (authz) library: RBAC + tenant + scope checks, deny-by-default | — | TL | 1.5 | T0.2.3 |
@@ -104,6 +104,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T0.3.2 | IaC: network, Kubernetes cluster, node pools, storage classes | — | SRE | 2 | T0.3.1 |
 | T0.3.3 | PostgreSQL HA with PITR, per-service schemas, RLS conventions | — | SRE | 1 | T0.3.2 |
 | T0.3.4 | Temporal cluster (Postgres persistence), cache, object storage | — | SRE | 1.5 | T0.3.2 |
+| T0.3.8 | NATS JetStream cluster (3 nodes, TLS, accounts per environment), streams per domain, monitoring, backup/restore of stream data | — | SRE | 1.5 | T0.3.2 |
 | T0.3.5 | GitOps repos per environment; progressive delivery controller | — | SRE | 1 | T0.3.2 |
 | T0.3.6 | Observability platform: collectors, metrics/logs/traces stores, dashboards, alerting (S50) | S50 | SRE | 2 | T0.3.2 |
 | T0.3.7 | Secrets bootstrap: root key provider for KMS | S07 | SRE | 0.5 | T0.3.2 |
@@ -323,7 +324,8 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 ### E2.0 Edge Agent and on-prem databases (cases B and C, T3) — moved from Phase 1
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T2.0.1 | Tunnel Gateway: mTLS, HTTP/2 streams, registry, routing, heartbeats | S03 | GO | 3 | T0.4.4 |
+| T2.0.0 | Spike (1 week): NATS leaf nodes / request-reply as Edge Agent transport vs in-house Tunnel Gateway; decide and adjust T2.0.1–T2.0.5 | S03, S22 | GO, TL | 1 | T0.3.8 |
+| T2.0.1 | Tunnel Gateway: mTLS, HTTP/2 streams, registry, routing, heartbeats | S03 | GO | 3 | T2.0.0 |
 | T2.0.2 | Edge Agent: enrollment (token → CSR → cert), tunnel client, reconnect/backoff | S22 | GO | 2 | T2.0.1 |
 | T2.0.3 | Edge Agent: signed command router + local policy (allow-list, read-only, row limits) | S22 | GO | 1.5 | T2.0.2 |
 | T2.0.4 | Edge Agent: SQL Server, MySQL, PostgreSQL drivers; query execution with streaming | S22 | GO | 2 | T2.0.3 |
@@ -474,7 +476,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T3.5.1 | Mapping improvements (active learning, template coverage); target ≥ 80% auto | S26 | AI | 3 | — |
 | T3.5.2 | CDS: automatic fallback ordering from observed latency/failures per connection | S27 | BE | 1 | — |
-| T3.5.3 | Chaos game days (tunnel loss, DB failover, Temporal loss) | — | SRE | 1 | — |
+| T3.5.3 | Chaos game days (tunnel loss, DB failover, NATS node loss, Temporal loss) | — | SRE | 1 | — |
 | T3.5.4 | Load test to 20M runs/month, 2,000 agents | — | SRE, QA | 2 | — |
 | T3.5.5 | Hubs #4–#6 onboarding; scale to 1,000 spokes | — | IE, PM | 6 | — |
 
