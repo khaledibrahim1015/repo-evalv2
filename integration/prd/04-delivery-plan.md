@@ -324,8 +324,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 ### E2.0 Edge Agent and on-prem databases (cases B and C, T3) — moved from Phase 1
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T2.0.0 | Spike (1 week): NATS leaf nodes / request-reply as Edge Agent transport vs in-house Tunnel Gateway; decide and adjust T2.0.1–T2.0.5 | S03, S22 | GO, TL | 1 | T0.3.8 |
-| T2.0.1 | Tunnel Gateway: mTLS, HTTP/2 streams, registry, routing, heartbeats | S03 | GO | 3 | T2.0.0 |
+| T2.0.1 | Tunnel Gateway: mTLS, HTTP/2 streams, registry, routing, heartbeats | S03 | GO | 3 | T0.4.4 |
 | T2.0.2 | Edge Agent: enrollment (token → CSR → cert), tunnel client, reconnect/backoff | S22 | GO | 2 | T2.0.1 |
 | T2.0.3 | Edge Agent: signed command router + local policy (allow-list, read-only, row limits) | S22 | GO | 1.5 | T2.0.2 |
 | T2.0.4 | Edge Agent: SQL Server, MySQL, PostgreSQL drivers; query execution with streaming | S22 | GO | 2 | T2.0.3 |
