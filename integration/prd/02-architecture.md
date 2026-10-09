@@ -560,7 +560,7 @@ See [05-tech-stack.md](05-tech-stack.md) §13: `apps/` (deployables), `modules/`
 | ADR-008 | Edge Agent in Go, outbound-only, signed commands |
 | ADR-009 | All agents behind LLM Gateway with mandatory PII Guard |
 | ADR-010 | Monorepo with shared service kits per language |
+| ADR-011 | NATS JetStream is the event backbone from day one (not Kafka): light to operate, request/reply, accounts for tenant isolation, replay, and leaf nodes for edge connectivity. Postgres outbox + relay keeps publishing atomic with data changes; consumers are idempotent. Durable multi-step processing stays in Temporal. All producers/consumers use the `events` interface in the service kits |
 | ADR-012 | Modular monolith: module boundaries = services in 03-services.md; shipped as 7 deployables; boundaries enforced by lint; modules extractable later |
 | ADR-013 | TypeScript, Python and Go from day one (TS core product, Python AI/extraction, Go edge/security/ledgers) |
 | ADR-014 | No agent frameworks: Anthropic SDK + own Agent Runtime + Temporal |
-| ADR-011 | NATS JetStream is the event backbone from day one (not Kafka): light to operate, request/reply, accounts for tenant isolation, replay, and leaf nodes for edge connectivity. Postgres outbox + relay keeps publishing atomic with data changes; consumers are idempotent. Durable multi-step processing stays in Temporal. All producers/consumers use the `events` interface in the service kits |
