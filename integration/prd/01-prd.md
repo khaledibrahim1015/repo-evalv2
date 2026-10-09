@@ -82,6 +82,26 @@ F  Data held by third parties   ETA e-invoices · bank statements · POS/marketp
 
 **Problem in one sentence:** a fintech must exchange data in both directions with thousands of merchants, each with a different system or none at all, reliably and at near-zero cost per merchant.
 
+### 2.2 Priority order (we do not cover every case at once)
+
+Ranking criteria: merchants covered per build · effort asked of the merchant · build and run cost · data quality.
+
+| # | Case | Delivery | Why |
+|---|---|---|---|
+| 1 | **F** — ETA, bank statements, the fintech's own records (T6) | MVP | One connector covers every registered merchant; merchant only consents; trusted data |
+| 2 | **D** — Excel and email (T7) | MVP | Likely the largest group; cheap to build; works for any merchant, including ERP users who export to Excel |
+| 2 | **Micro-app pilot** (T8b) as the upgrade path for D/E | MVP pilot → Phase 2 if it passes | Structured data at the source, real-time, and a place to write back. Starts from the merchant's Excel; narrow to the hub's flow; benefit offered by the hub. Success = ≥ 40% of pilot merchants still active after 60 days |
+| 3 | **A** — Cloud ERP with API (T1) | MVP | Easy and high quality; one template covers all merchants on a system; fewer merchants |
+| 4 | **B / C** — Databases via Edge Agent (T3) | Phase 2 | High value for mid-size merchants but costly (agent, security, IT trust); top 2–3 local ERPs first |
+| 4 | **B2** — Turn any website into an API (T5) | Phase 2 | Covers cloud systems with no API and no DB access; built with reusable site profiles, self-healing, OTP via WhatsApp, read-only first |
+| 5 | **E** — WhatsApp / forms (T8a) | Phase 2 | Small, essential inputs only (confirmations, missing values) |
+| — | Vendor partnerships | Phase 3 | One integration with a local software vendor covers all its merchants |
+| — | T2 doc reader, T4 code → API, API generation | Deferred | See delivery plan §8 for triggers |
+
+**Write-back (fintech → merchant):** MVP = notifications (webhook/email/WhatsApp) + writes into micro-apps. Phase 2 = writes through cloud ERP APIs (A). Later = writes into on-prem systems (C).
+
+**What can change this order:** the merchant survey (delivery plan T0.1.2). If a large share of merchants run on-prem systems, B/C moves into the MVP.
+
 ---
 
 ## 3. Vision and goals
@@ -200,7 +220,7 @@ F  Data held by third parties   ETA e-invoices · bank statements · POS/marketp
 
 ### J7 — Write-back
 1. Hub posts a payment status (`POST /v1/spokes/{id}/data/payments`).
-2. CDS uses the write mapping for `Payment` and picks the target operation on the spoke system (API, DB via Edge Agent, generated API, or human task).
+2. CDS uses the write mapping for `Payment`: in the MVP it writes into the merchant's micro-app or sends a notification (webhook/email/WhatsApp); from Phase 2 it can write through a cloud ERP API.
 3. Dry-run preview → approval policy → idempotent write → reconciled.
 
 ### J8 — Spoke reuses connection for a second hub
@@ -212,7 +232,7 @@ F  Data held by third parties   ETA e-invoices · bank statements · POS/marketp
 
 ## 7. Functional requirements
 
-Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
+Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5, **Deferred** = not scheduled (delivery plan §8). Order of cases follows §2.2.
 
 ### 7.1 Tenancy, identity, access
 | ID | Requirement | P |
@@ -240,7 +260,7 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | FR-CN-01 | Embeddable `connect.js` widget (web) with theming, Arabic/English, RTL | P0 |
 | FR-CN-02 | Hosted connect link (shareable via email/WhatsApp/SMS) | P0 |
 | FR-CN-03 | System picker with search over known systems and "own system / Excel / nothing" paths | P0 |
-| FR-CN-04 | Guided flows per tier (OAuth, API key, docs upload, Edge Agent install, inbox, human tasks) | P0 (T1, T3, T6, T7) / P1 (T2, T4, T5, T8) |
+| FR-CN-04 | Guided flows per tier (OAuth, API key, docs upload, Edge Agent install, inbox, human tasks) | P0 (T6, T7, T1, T8b pilot) / P1 (T3, T5, T8a) / Deferred (T2, T4) |
 | FR-CN-05 | Progress and status page for spokes; resumable flows | P0 |
 | FR-CN-06 | Mobile-friendly flows (spokes often on phones) | P0 |
 | FR-CN-07 | Hub can pre-fill spoke details and choose allowed tiers | P1 |
@@ -252,24 +272,24 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | FR-CX-02 | Credential storage encrypted with per-tenant keys; never shown after entry | P0 |
 | FR-CX-03 | OAuth 2.0 flows with token refresh; API key, basic, mTLS, custom header auth | P0 |
 | FR-CX-04 | Health checks per connection; degraded/paused states with reason | P0 |
-| FR-CX-05 | Edge Agent: single binary for Linux/Windows, one-command install, outbound-only TLS tunnel, auto-update, local buffer | P0 |
-| FR-CX-06 | Edge Agent DB connectors: SQL Server, MySQL/MariaDB, PostgreSQL, Oracle; read-only by default | P0 (SQL Server, MySQL, PostgreSQL) / P1 (Oracle) |
+| FR-CX-05 | Edge Agent: single binary for Linux/Windows, one-command install, outbound-only TLS tunnel, auto-update, local buffer | P1 |
+| FR-CX-06 | Edge Agent DB connectors: SQL Server, MySQL/MariaDB, PostgreSQL, Oracle; read-only by default | P1 |
 | FR-CX-07 | Edge Agent CDC (log-based where available, polling with watermark otherwise) | P1 |
-| FR-CX-08 | Edge Agent hosts generated APIs (S2) | P1 |
+| FR-CX-08 | Edge Agent hosts generated APIs (S2) | Deferred |
 | FR-CX-09 | Rate limiting and circuit breaker per connection | P0 |
 
 ### 7.5 Discovery (Connectivity Ladder)
 | ID | Requirement | P |
 |---|---|---|
-| FR-DI-01 | Discovery Orchestrator runs tiers per entity and records chosen tier and reason | P0 (T1, T3, T6, T7) / P1 (all) |
+| FR-DI-01 | Discovery Orchestrator runs tiers per entity and records chosen tier and reason | P0 (T6, T7, T1, T8b) / P1 (T3, T5, T8a) |
 | FR-DI-02 | T1: OpenAPI 2/3, Postman, GraphQL introspection, SOAP/WSDL ingestion | P0 (OpenAPI, Postman) / P1 (GraphQL, WSDL) |
-| FR-DI-03 | T2: Doc reader agent from PDF/HTML/portal URL → draft OpenAPI with confidence | P1 |
-| FR-DI-04 | T3: DB introspection (tables, keys, enums, samples), entity inference, PII detection | P0 |
-| FR-DI-05 | T4: Code analyzer for named stacks (PHP/Laravel, .NET, Node) → operations | P1 |
-| FR-DI-06 | T5: Traffic analyzer from recorded browser sessions → internal API client | P1 |
-| FR-DI-07 | T6: Country-pack connectors (Egypt ETA e-invoice/e-receipt; KSA ZATCA later) | P0 (ETA) / P1 (ZATCA) |
+| FR-DI-03 | T2: Doc reader agent from PDF/HTML/portal URL → draft OpenAPI with confidence | Deferred |
+| FR-DI-04 | T3: DB introspection (tables, keys, enums, samples), entity inference, PII detection | P1 |
+| FR-DI-05 | T4: Code analyzer for named stacks (PHP/Laravel, .NET, Node) → operations | Deferred |
+| FR-DI-06 | T5: Turn any website into an API: guided recording, internal-call analysis, reusable site profiles per platform, session vault with OTP via WhatsApp, self-healing, read-only first | P1 |
+| FR-DI-07 | T6: Shared sources: Egypt ETA e-invoice/e-receipt, bank statements, the hub's own records per merchant; KSA ZATCA later | P0 (ETA, bank, hub data) / P1 (ZATCA) |
 | FR-DI-08 | T7: Inbox + upload ingestion of Excel/CSV/PDF/images → typed records with confidence | P0 (Excel/CSV) / P1 (PDF, images) |
-| FR-DI-09 | T8: Human tasks and micro-apps exposed as capabilities | P1 (T8a) / P2 (T8b) |
+| FR-DI-09 | T8: Human tasks and micro-apps exposed as capabilities | P0 (T8b pilot) / P1 (T8a, T8b expansion) |
 | FR-DI-10 | Scheduled re-discovery, CM diff, breaking-change classification | P0 |
 | FR-DI-11 | Automatic tier upgrade when a better path appears, with reconciliation check | P1 |
 
@@ -293,7 +313,7 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | FR-DS-03 | Consent check on every read/write | P0 |
 | FR-DS-04 | Source metadata on every record (connection, tier, fetched at, confidence for T7/T8) | P0 |
 | FR-DS-05 | Clear error when no connection supplies an entity | P0 |
-| FR-DS-06 | Write canonical entities: reverse mapping, target operation, dry-run, idempotency | P0 (dry-run, T1/T3) / P1 (all tiers) |
+| FR-DS-06 | Write canonical entities: reverse mapping, target operation, dry-run, idempotency | P0 (micro-apps; notifications elsewhere) / P1 (T1 APIs) / P2 (T3) |
 | FR-DS-07 | Caching per (connection, entity, filters) with TTL per tier | P0 |
 | FR-DS-08 | Change feed: push changed canonical records to hubs | P2 |
 
@@ -341,19 +361,20 @@ Priority: **P0** = MVP (Phase 1), **P1** = Phase 2–3, **P2** = Phase 4–5.
 | FR-HT-04 | Reminders, escalation, SLA per task | P1 |
 | FR-HT-05 | Arabic (Egyptian and Gulf dialects) and English | P1 |
 
-### 7.12 API generation (S2)
+### 7.12 API generation (S2) — deferred
 | ID | Requirement | P |
 |---|---|---|
-| FR-AG-01 | Generate REST API from DB (curated reads + specific writes) deployed in Edge Agent | P1 |
-| FR-AG-02 | Generate API layer from codebase for named stacks, delivered as PR or Edge service | P1 |
-| FR-AG-03 | Generated APIs have OpenAPI, tests, and feed back into CM as T1 | P1 |
+| FR-AG-01 | Generate REST API from DB (curated reads + specific writes) deployed in Edge Agent | Deferred |
+| FR-AG-02 | Generate API layer from codebase for named stacks, delivered as PR or Edge service | Deferred |
+| FR-AG-03 | Generated APIs have OpenAPI, tests, and feed back into CM as T1 | Deferred |
 
 ### 7.13 Micro-apps (T8b)
 | ID | Requirement | P |
 |---|---|---|
-| FR-MA-01 | Generate app (tables, forms, status board, import/export) from selected models | P2 |
-| FR-MA-02 | Arabic/English, mobile-first, roles for the spoke's staff | P2 |
-| FR-MA-03 | Micro-app data exposed as T1 capability automatically | P2 |
+| FR-MA-01 | Generate a narrow app (lists, forms, status board) from canonical entities of the hub's flow; starts from the merchant's Excel | P0 (pilot) / P1 (expansion) |
+| FR-MA-02 | Arabic/English, mobile-first PWA, WhatsApp links and notifications, roles for the spoke's staff | P0 |
+| FR-MA-03 | Micro-app data exposed as T1 capability automatically; hub write-back lands in the app | P0 |
+| FR-MA-04 | Pilot gate: expand only if ≥ 40% of pilot merchants are active after 60 days | P0 |
 
 ### 7.14 Agents platform
 | ID | Requirement | P |
@@ -459,10 +480,10 @@ Detailed plan in [04-delivery-plan.md](04-delivery-plan.md).
 | Phase | Months | Theme | Exit |
 |---|---|---|---|
 | 0 | 0–1.5 | Foundations | Platform skeleton, canonical model v0, mapping prototype, design partners signed |
-| 1 | 1.5–5 | MVP: Egypt fintech hub | 1 hub, ≥20 spokes, ≥3 tiers, reconciliation live |
-| 2 | 5–9 | All ladder tiers | API generation, human tasks, Money Ledger, Ops Agent; 3 hubs |
-| 3 | 9–13 | Network & KSA | Connection reuse, proof of agreement, KSA region, SOC 2 Type I; 6 hubs |
-| 4 | 13–18 | Micro-apps & 2nd vertical | Micro-apps GA, second vertical live; 8 hubs |
+| 1 | 1.5–5 | MVP: Egypt fintech hub | 1 hub, ≥20 spokes; F + D + A live; micro-app pilot; reconciliation live |
+| 2 | 5–9 | On-prem, websites, human tasks | Edge Agent, website → API, human tasks, micro-app expansion, Money Ledger, Ops Agent; 3 hubs |
+| 3 | 9–13 | Network & KSA | Connection reuse, vendor partnerships, proof of agreement, KSA region, SOC 2 Type I; 6 hubs |
+| 4 | 13–18 | 2nd vertical | Second vertical live (with micro-apps); 8 hubs |
 | 5 | 18–24 | Scale & GA hardening | Self-serve, marketplace, SOC 2 Type II, scale targets; 10+ hubs |
 
 ---

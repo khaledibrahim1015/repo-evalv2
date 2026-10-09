@@ -24,7 +24,7 @@ gantt
   Phase 1 MVP Egypt fintech     :p1, after p0, 14w
   Phase 2 Full ladder           :p2, after p1, 17w
   Phase 3 Network & KSA         :p3, after p2, 17w
-  Phase 4 Micro-apps & vertical2:p4, after p3, 22w
+  Phase 4 Second vertical      :p4, after p3, 22w
   Phase 5 Scale & GA            :p5, after p4, 28w
   section Milestones
   Design partners signed        :milestone, m0, 2026-12-13, 0d
@@ -154,11 +154,12 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 
 ## 3. Phase 1 — MVP: Egypt fintech hub (Weeks 6–20)
 
-**Goal:** first hub in production with real spokes across at least three ladder tiers, canonical data reads, durable runs, and reconciliation.
+**Goal:** first hub in production with the highest-priority cases (F, D, A) plus a micro-app pilot, canonical data reads, durable runs, and reconciliation.
 
 **Exit criteria**
-- 1 hub live; ≥ 20 spokes connected using ≥ 3 tiers (T1, T3, T6, T7 available).
-- Data products live: Merchant Profile, Sales History, Issued E-Invoices, Customers, Payment Status write-back (T1/T3 dry-run + approved writes).
+- 1 hub live; ≥ 20 spokes connected using ≥ 3 tiers (T6, T7, T1, T8b pilot available).
+- Data products live: Merchant Profile, Sales History, Issued E-Invoices, Customers, Bank Lines, Payment Status back to merchants (notifications; writes into micro-apps).
+- Micro-app pilot running with 20–30 merchants from cases D/E; 60-day retention measured (go/expand if ≥ 40%).
 - ≥ 60% fields auto-mapped above threshold; median spoke onboarding < 1 day.
 - ≥ 99.5% run success after retries; ≥ 99% agreement score on reconciled objects.
 - Production cell live in Egypt with backups, on-call, runbooks; external pen test passed (no high findings open).
@@ -184,32 +185,25 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T1.2.6 | Region & Country Pack v1: Egypt pack (tax id validators, EGP, calendar, ETA binding, residency) | S08 | BE, DOM | 1.5 | — |
 | T1.2.7 | Postgres RLS enforcement tests across all services | — | QA | 1 | T0.2.9 |
 
-### E1.3 Connections & Edge Agent
+### E1.3 Connections and shared sources
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T1.3.1 | Connection service: model, lifecycle state machine, credential capture → KMS | S12 | BE | 2 | T0.4.4 |
 | T1.3.2 | OAuth 2.0 flows (auth code, PKCE, client credentials), refresh scheduler | S12 | BE | 1.5 | T1.3.1 |
 | T1.3.3 | Known-systems catalog v1: Odoo, Zoho Books, QuickBooks Online, Dynamics 365 BC + 3 local Egyptian ERPs (auth templates, CM templates) | S12 | IE | 3 | T1.3.1 |
 | T1.3.4 | Health checks and degraded/paused handling | S12 | BE | 1 | T1.3.1 |
-| T1.3.5 | Tunnel Gateway: mTLS, HTTP/2 streams, registry, routing, heartbeats | S03 | GO | 3 | T0.4.4 |
-| T1.3.6 | Edge Agent: enrollment (token → CSR → cert), tunnel client, reconnect/backoff | S22 | GO | 2 | T1.3.5 |
-| T1.3.7 | Edge Agent: signed command router + local policy (allow-list, read-only, row limits) | S22 | GO | 1.5 | T1.3.6 |
-| T1.3.8 | Edge Agent: SQL Server, MySQL, PostgreSQL drivers; query execution with streaming | S22 | GO | 2 | T1.3.7 |
-| T1.3.9 | Edge Agent: encrypted local buffer + outbox | S22 | GO | 1 | T1.3.6 |
-| T1.3.10 | Edge Agent: auto-update (signed, staged, rollback), Windows service + systemd packaging, installer one-liner | S22 | GO, SRE | 2 | T1.3.6 |
-| T1.3.11 | Edge Agent: local status page + local audit log + diagnostics bundle | S22 | GO | 1 | T1.3.7 |
 | T1.3.12 | Webhook Ingress: per-connection endpoints, signature verification, persist-then-ack, dedup | S02 | GO | 1.5 | T0.2.6 |
 | T1.3.13 | Connector Runtime: HTTP/REST adapter, auth injection, pagination strategies, retries, breaker, rate limits | S20 | BE | 3 | T1.3.1 |
-| T1.3.14 | Connector Runtime: SQL-via-Edge adapter | S20 | BE | 1 | T1.3.8 |
 | T1.3.15 | Connector Runtime: document-dataset adapter (T7 records as operations) | S20 | BE | 1 | T1.4.6 |
 | T1.3.16 | ETA connector: auth, document search, document details, status; CM + mapping template to the canonical model | S21 | BE, DOM | 2.5 | T1.3.13 |
+| T1.3.17 | Bank statement ingestion (MT940/CAMT/CSV/Excel) as T6/T7 source | S21 | BE | 2 | T1.4.4 |
+| T1.3.18 | Hub-data connector: ingest the fintech's own records per merchant (transactions, collections) as a T6 source | S21 | BE, IE | 1.5 | T1.3.13 |
 
 ### E1.4 Discovery & ingestion
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T1.4.1 | Discovery Orchestrator: workflow per connection, tier selection rules per entity, merge to CM, status events | S13 | BE | 3 | T0.2.8 |
 | T1.4.2 | Spec Ingestor: OpenAPI 2/3 parse/normalize, Postman → OpenAPI, pagination/auth/error inference | S14 | BE | 2.5 | T0.5.4 |
-| T1.4.3 | DB Introspector: schema, keys, samples (masked), entity inference, PII detection, generated read ops | S16 | AI | 3 | T1.3.8 |
 | T1.4.4 | Document Extractor: upload endpoint, Excel/CSV structure detection (AR/EN headers), typed records + confidence | S19 | AI | 3 | T0.6.3 |
 | T1.4.5 | Document Extractor: per-spoke template learning (no LLM on repeat layouts) | S19 | AI | 1.5 | T1.4.4 |
 | T1.4.6 | T7 dataset model: versioned record sets per connection exposed as CM | S19, S24 | BE | 1 | T1.4.4 |
@@ -228,7 +222,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T1.5.8 | CDS: consent check integration | S27 | BE | 1 | T1.2.4 |
 | T1.5.9 | CDS: cache with TTL per tier + invalidation on events | S27 | BE | 1 | T1.5.7 |
 | T1.5.10 | CDS: filters, pagination, get by id across adapters | S27 | BE | 1.5 | T1.5.7 |
-| T1.5.11 | CDS: writes with reverse mapping, dry-run and idempotency (T1/T3) | S27 | BE | 2 | T1.5.7 |
+| T1.5.11 | CDS: writes with reverse mapping, dry-run and idempotency (micro-app target in MVP) | S27 | BE | 2 | T1.5.7 |
 | T1.5.12 | Expression language v1 + conversions (dated FX rates, units, time zones, enum maps) | S27 | BE | 1.5 | T0.5.7 |
 
 ### E1.6 Integration runtime
@@ -267,13 +261,12 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T1.9.1 | Connect Service: sessions, invite links, flow state machine, theming | S47 | BE | 2 | T1.2.4 |
 | T1.9.2 | Connect UI: landing, consent, system picker, T1 OAuth/API key flows | S47 | FE | 2.5 | T1.9.1 |
-| T1.9.3 | Connect UI: T3 Edge Agent install and enrollment flow with live status | S47 | FE | 1.5 | T1.3.6 |
 | T1.9.4 | Connect UI: T6 ETA authorization flow | S47 | FE | 1 | T1.3.16 |
 | T1.9.5 | Connect UI: T7 upload/inbox flow | S47 | FE | 1 | T1.4.4 |
 | T1.9.6 | `connect.js` embeddable loader + hosted pages; mobile responsive | S47 | FE | 1.5 | T1.9.2 |
 | T1.9.7 | Console BFF: sessions, aggregation, SSE live updates | S46 | BE | 2 | T1.2.1 |
 | T1.9.8 | Hub Console: overview, spokes, connections, data products, integrations, runs/DLQ, breaks, webhooks, API keys, team | — | FE | 6 | T1.9.7 |
-| T1.9.9 | Spoke Portal: connections, hubs & consent, breaks involving me, Edge Agent status, team | — | FE | 3 | T1.9.7 |
+| T1.9.9 | Spoke Portal: connections, hubs & consent, breaks involving me, team | — | FE | 3 | T1.9.7 |
 | T1.9.10 | Studio: mapping review queue, mapping templates, discovery review, document review, tenants, canonical model viewer | — | FE | 3 | T1.9.7 |
 | T1.9.11 | Notification service: email + WhatsApp templates, in-app inbox, preferences | S10 | BE | 2 | T0.2.6 |
 | T1.9.12 | Usability tests of Connect with 8 merchants; fixes | — | UX, FE | 1.5 | T1.9.6 |
@@ -290,57 +283,85 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T1.11.1 | Metering: usage events from gateway, runtime, CDS, recon; daily aggregates; usage API | S11 | BE | 1.5 | T0.2.6 |
 
+### E1.13 Micro-app pilot (T8b) and write-back by notification
+| ID | Task | Svc | Role | pw | Dep |
+|---|---|---|---|---|---|
+| T1.13.1 | Pilot scope with hub: one narrow app on the hub's flow (invoices, receivables, collections) and the merchant benefit the hub offers | — | PM, DOM | 0.5 | T0.1.3 |
+| T1.13.2 | App model: canonical entities → screens (lists, forms, details, status), simple roles | S39 | BE | 2 | T1.5.3 |
+| T1.13.3 | Runtime: per-app storage, CRUD APIs, validation from the canonical model, audit | S39 | BE | 2.5 | T1.13.2 |
+| T1.13.4 | Mobile-first PWA (AR/EN), WhatsApp deep links and notifications | S39 | FE | 3 | T1.13.2 |
+| T1.13.5 | Start from Excel: import the merchant's uploaded file into the app (no blank start) | S39, S19 | BE | 1 | T1.4.4 |
+| T1.13.6 | App data exposed as T1 capability with generated CM and mapping | S39, S24 | BE | 1 | T1.13.3 |
+| T1.13.7 | Write-back into the app (payment status, settlements) via CDS | S27, S39 | BE | 1 | T1.5.11 |
+| T1.13.8 | Write-back by notification for all other merchants (webhook/email/WhatsApp) | S10, S31 | BE | 1 | T1.9.11 |
+| T1.13.9 | Connect path "use the app instead of Excel" | S47 | FE | 1 | T1.13.4 |
+| T1.13.10 | Run pilot with 20–30 merchants; measure 60-day retention and data quality vs Excel | — | PM, IE | 3 | all |
+
 ### E1.12 Security & launch
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T1.12.1 | Threat model (STRIDE) for Connect, Edge, CDS, KMS | — | TL | 1 | — |
+| T1.12.1 | Threat model (STRIDE) for Connect, CDS, KMS, micro-apps | — | TL | 1 | — |
 | T1.12.2 | Security hardening checklist (ASVS L2) per service | — | TL, BE | 1.5 | T1.12.1 |
-| T1.12.3 | External pen test (web, API, Edge Agent); fix high/critical | — | TL | 2 | all |
-| T1.12.4 | Edge Agent security whitepaper for spoke IT (AR/EN) | — | TL, PM | 0.5 | T1.3.11 |
+| T1.12.3 | External pen test (web, API, micro-apps); fix high/critical | — | TL | 2 | all |
 | T1.12.5 | Design partner onboarding: hub integration workshop, first 5 spokes white-glove | — | IE, PM | 2 | all |
 | T1.12.6 | Scale to 20+ spokes; collect metrics; MVP exit review | — | PM, IE | 3 | T1.12.5 |
 
 ---
 
-## 4. Phase 2 — Full Connectivity Ladder (Weeks 20–37)
+## 4. Phase 2 — On-prem, websites and human tasks (Weeks 20–37)
 
-**Goal:** every tier available; API generation; human-as-API; money ledger; automated operations. Second and third hubs live.
+**Goal:** reach on-prem databases (Edge Agent), turn websites into APIs, add human tasks, expand micro-apps if the pilot passed; money ledger; automated operations. Second and third hubs live.
 
 **Exit criteria**
-- 3 hubs live; ≥ 150 spokes; every tier T1–T8a used in production at least once.
-- 3 integrations live where a side had no API (S2) and 1 where a side had no system (T8a).
+- 3 hubs live; ≥ 150 spokes; T3 (Edge Agent), T5 (website → API) and T8a used in production.
+- ≥ 3 website site profiles live, each reused by ≥ 10 merchants; read success ≥ 99% after self-healing.
+- Micro-apps expanded (if pilot passed) to ≥ 100 merchants; write-back via T1 APIs live.
 - Money Ledger live for payment status and settlements; orphan-money matching ≥ 90% auto.
 - Ops Agent proposals accepted ≥ 60%; MTTR for drift < 4 h.
 - ≥ 70% fields auto-mapped.
 
-### E2.1 Ladder completion
+### E2.0 Edge Agent and on-prem databases (cases B and C, T3) — moved from Phase 1
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T2.1.1 | Doc Reader: crawl, PDF/HTML parse, endpoint extraction, draft OpenAPI with confidence | S15 | AI | 4 | — |
-| T2.1.2 | Doc Reader: safe probing with test credentials to confirm endpoints | S15 | AI, BE | 1.5 | T2.1.1 |
-| T2.1.3 | Code Sandbox: isolation runtime, limits, artifact I/O, network allow-list | S43 | GO | 3 | — |
-| T2.1.4 | Code Analyzer: PHP/Laravel parser + extractors | S17 | AI | 3 | T2.1.3 |
-| T2.1.5 | Code Analyzer: C#/.NET parser + extractors | S17 | AI | 3 | T2.1.3 |
-| T2.1.6 | Code Analyzer: Node/TS parser + extractors | S17 | AI | 2 | T2.1.3 |
-| T2.1.7 | Code Analyzer: business-operation identification agent + review UI | S17 | AI, FE | 2 | T2.1.4 |
-| T2.1.8 | Traffic Analyzer: browser helper (record guided session, redact), HAR upload | S18 | FE, AI | 2 | — |
-| T2.1.9 | Traffic Analyzer: chain/auth/CSRF inference, client generation, replay tests, fragility monitor | S18 | AI | 4 | T2.1.8 |
+| T2.0.1 | Tunnel Gateway: mTLS, HTTP/2 streams, registry, routing, heartbeats | S03 | GO | 3 | T0.4.4 |
+| T2.0.2 | Edge Agent: enrollment (token → CSR → cert), tunnel client, reconnect/backoff | S22 | GO | 2 | T2.0.1 |
+| T2.0.3 | Edge Agent: signed command router + local policy (allow-list, read-only, row limits) | S22 | GO | 1.5 | T2.0.2 |
+| T2.0.4 | Edge Agent: SQL Server, MySQL, PostgreSQL drivers; query execution with streaming | S22 | GO | 2 | T2.0.3 |
+| T2.0.5 | Edge Agent: encrypted local buffer + outbox | S22 | GO | 1 | T2.0.2 |
+| T2.0.6 | Edge Agent: auto-update (signed, staged, rollback), Windows service + systemd packaging, installer one-liner | S22 | GO, SRE | 2 | T2.0.2 |
+| T2.0.7 | Edge Agent: local status page + local audit log + diagnostics bundle | S22 | GO | 1 | T2.0.3 |
+| T2.0.8 | Connector Runtime: SQL-via-Edge adapter | S20 | BE | 1 | T2.0.4 |
+| T2.0.9 | DB Introspector: schema, keys, samples (masked), entity inference, PII detection, generated read ops | S16 | AI | 3 | T2.0.4 |
+| T2.0.10 | Connect UI: T3 Edge Agent install and enrollment flow with live status | S47 | FE | 1.5 | T2.0.2 |
+| T2.0.11 | Edge Agent security whitepaper for spoke IT (AR/EN) | — | TL, PM | 0.5 | T2.0.7 |
+
+### E2.1 Website → API (T5) and remaining ingestion
+| ID | Task | Svc | Role | pw | Dep |
+|---|---|---|---|---|---|
+| T2.1.1 | Browser helper: guided recording of a merchant session with consent and PII redaction; HAR upload | S18 | FE, AI | 2 | — |
+| T2.1.2 | Traffic analysis: request chains, auth/session, CSRF; prefer internal network calls over screen clicks | S18 | AI | 3 | T2.1.1 |
+| T2.1.3 | Site profiles: one reusable profile per website/platform, shared by all merchants on it | S18 | AI, BE | 2 | T2.1.2 |
+| T2.1.4 | Headless browser runner (isolated) for flows that need screen automation | S18 | GO | 2.5 | T2.1.2 |
+| T2.1.5 | Session vault: credentials in KMS, session refresh, OTP/captcha requested from the merchant via WhatsApp | S18, S07, S38 | BE | 2 | T2.3.2 |
+| T2.1.6 | Self-healing: synthetic checks per profile, change detection, agent re-derives the profile, review before rollout | S18, S44 | AI | 3 | T2.1.3 |
+| T2.1.7 | Read-only first; per-site legal/ToS review checklist before enabling a profile | — | PM | 0.5 | — |
+| T2.1.8 | Code Sandbox: isolation runtime, limits, artifact I/O, network allow-list (used by `code` steps and browser runner) | S43 | GO | 3 | — |
 | T2.1.10 | Document Extractor: PDF + image OCR (AR/EN), email inbox ingestion | S19 | AI | 3 | T1.4.4 |
 | T2.1.11 | Spec Ingestor: GraphQL introspection, WSDL/SOAP | S14 | BE | 2 | T1.4.2 |
 | T2.1.12 | Connector Runtime: GraphQL and SOAP adapters | S20 | BE | 1.5 | T2.1.11 |
-| T2.1.13 | Discovery: all tiers in orchestrator; tier upgrade detection + migration with recon check | S13 | BE | 2.5 | T1.4.1 |
-| T2.1.14 | Edge Agent: Oracle driver, file watcher (shared folders), CDC (log-based SQL Server/MySQL/Postgres + watermark polling) | S22 | GO | 4 | T1.3.8 |
+| T2.1.13 | Discovery: tier upgrade detection + migration with recon check | S13 | BE | 2.5 | T1.4.1 |
+| T2.1.14 | Edge Agent: Oracle driver, file watcher (shared folders), CDC (log-based SQL Server/MySQL/Postgres + watermark polling) | S22 | GO | 4 | T2.0.4 |
 | T2.1.15 | CDC events → Orchestration triggers; CDS cache invalidation | S31, S27 | BE | 1 | T2.1.14 |
-| T2.1.16 | Connect UI: T2, T4, T5, T8a paths | S47 | FE | 3 | above |
+| T2.1.16 | Connect UI: website (T5) and human-task (T8a) paths | S47 | FE | 2 | above |
+| T2.1.17 | CDS writes to T1 APIs (approved write-back into cloud ERPs) | S27 | BE | 1.5 | T1.5.11 |
 
-### E2.2 API generation (S2)
+### E2.2 Micro-apps expansion (only if the pilot passed)
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T2.2.1 | API Generator: DB → curated read/write endpoints (validation, stored procedures, transactions) | S23 | BE, AI | 4 | T1.4.3 |
-| T2.2.2 | Edge Agent: plugin host for generated APIs (sandboxed, versioned, rollback) | S22 | GO | 2.5 | T2.2.1 |
-| T2.2.3 | API Generator: code → thin API layer for Laravel/.NET/Node; PR delivery or Edge plugin | S23 | AI | 5 | T2.1.7 |
-| T2.2.4 | Generated OpenAPI + tests; run in Sandbox; publish as T1 capability | S23, S33 | BE | 2 | T2.2.1 |
-| T2.2.5 | Verification: fuzz/property tests for generated APIs | S33 | QA | 1.5 | T2.2.4 |
+| T2.2.1 | More screens and entities based on pilot feedback (still limited to the hub's flows) | S39 | BE, FE | 3 | T1.13.10 |
+| T2.2.2 | Import/export (Excel), bulk edit, offline drafts | S39 | FE, BE | 2 | T1.13.3 |
+| T2.2.3 | Upgrades on canonical model changes (migrations) | S39 | BE | 1.5 | T1.13.3 |
+| T2.2.4 | Spoke Portal: manage app users and roles | — | FE | 1 | T1.13.3 |
 
 ### E2.3 Human-as-API (T8a)
 | ID | Task | Svc | Role | pw | Dep |
@@ -361,7 +382,6 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T2.4.3 | Posting templates in specs (`ledger:` block) + Orchestration activity | S30, S31 | BE | 1.5 | T2.4.1 |
 | T2.4.4 | Reconciler: value_mismatch and orphan_money breaks; tolerances | S36 | BE | 2 | T1.7.3 |
 | T2.4.5 | Payment matching: rules engine (amount, date, reference parsing) + agent suggestions | S36 | AI, BE | 3 | T2.4.4 |
-| T2.4.7 | Bank statement ingestion (MT940/CAMT/CSV) as T6/T7 source | S21 | BE | 2 | — |
 
 ### E2.5 Automated operations
 | ID | Task | Svc | Role | pw | Dep |
@@ -376,7 +396,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
 | T2.6.1 | Designer Agent: intent → spec draft + fixtures + explanation; iterate on validation | S29 | AI | 3 | T1.6.4 |
-| T2.6.2 | `code` step via Sandbox (TypeScript functions) | S31, S43 | BE | 1.5 | T2.1.3 |
+| T2.6.2 | `code` step via Sandbox (TypeScript functions) | S31, S43 | BE | 1.5 | T2.1.8 |
 | T2.6.3 | CLI: `wasla spec push/test/diff`, `wasla cdm validate/publish` | — | BE | 1.5 | T1.6.2 |
 | T2.6.4 | Hub Console: spec editor with validation, diff, test report | — | FE | 2 | T1.6.9 |
 
@@ -441,6 +461,14 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T3.4.2 | Invoices (EG/SA tax compliant), local payment providers | S11 | BE | 2.5 | T3.4.1 |
 | T3.4.3 | Usage & billing UI in Hub Console | — | FE | 1.5 | T3.4.1 |
 
+### E3.6 Vendor partnerships
+| ID | Task | Svc | Role | pw | Dep |
+|---|---|---|---|---|---|
+| T3.6.1 | Rank local ERP/accounting vendors by number of merchants across hubs (from survey + connection data) | — | PM, IE | 1 | — |
+| T3.6.2 | Partnership program: terms, technical options (vendor API, vendor-hosted export, vendor-installed agent) | — | PM | 2 | T3.6.1 |
+| T3.6.3 | Build vendor connectors + mapping templates for the top 3 vendors | S12, S26 | BE, IE | 6 | T3.6.2 |
+| T3.6.4 | Migrate existing merchants of those vendors to the vendor connector (with recon check) | S13 | IE | 2 | T3.6.3 |
+
 ### E3.5 Quality & scale
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
@@ -452,26 +480,20 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 
 ---
 
-## 6. Phase 4 — Micro-apps & Second Vertical (Weeks 54–76)
+## 6. Phase 4 — Second Vertical (Weeks 54–76)
 
-**Goal:** cover parties with no system through micro-apps; launch a second vertical on the same engine.
+**Goal:** launch a second vertical on the same engine; extend micro-apps to the new vertical.
 
 **Exit criteria**
-- Micro-apps GA; ≥ 100 spokes using micro-apps.
+- Micro-apps available in both verticals; ≥ 500 spokes using micro-apps.
 - Second vertical (decided by Month 12: retail/distribution buyer or logistics/3PL) live with ≥ 1 hub and ≥ 50 spokes.
 - 8 hubs; ≥ 5,000 spokes; ≥ 80% fields auto-mapped.
 
-### E4.1 Micro-app platform
+### E4.1 Micro-apps for the second vertical
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T4.1.1 | App model: selected models → screens (lists, forms, details, status boards), roles | S39 | BE | 3 | — |
-| T4.1.2 | Runtime: per-app schema storage, CRUD APIs, validation from the canonical model, audit | S39 | BE | 3 | T4.1.1 |
-| T4.1.3 | PWA UI generator (mobile-first, AR/EN, offline drafts) | S39 | FE | 4 | T4.1.1 |
-| T4.1.4 | Import/export (Excel), bulk edit | S39 | FE, BE | 1.5 | T4.1.2 |
-| T4.1.5 | Auto-generated CM (T1) from app models; mappings generated automatically | S39, S24 | BE | 1.5 | T4.1.2 |
-| T4.1.6 | Upgrades on type-library changes (migrations) | S39 | BE | 1.5 | T4.1.2 |
-| T4.1.7 | Connect path: "activate a micro-app" | S47 | FE | 1 | T4.1.3 |
-| T4.1.8 | Micro-app billing add-on | S11 | BE | 0.5 | T3.4.1 |
+| T4.1.1 | Micro-app templates for the vertical's flows (e.g. orders, deliveries) | S39 | BE, FE | 3 | T4.2.2 |
+| T4.1.2 | Micro-app billing add-on | S11 | BE | 0.5 | T3.4.1 |
 
 ### E4.2 Second vertical
 | ID | Task | Svc | Role | pw | Dep |
@@ -543,7 +565,16 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 
 ---
 
-## 8. Cross-phase workstreams
+## 8. Deferred backlog (not scheduled)
+
+| Item | Why deferred | Trigger to schedule |
+|---|---|---|
+| T2 — Doc Reader (API docs → spec) | Rare among SMB merchants | ≥ 5 merchants/hubs with documented APIs and no OpenAPI |
+| T4 — Code Analyzer (codebase → operations) | SMB merchants use packaged software and don't own code; DB access gives the same data | Large hubs or second-vertical counterparties with in-house systems; or safe write-back needs business logic |
+| API generation from DB or code (S23) + Edge plugin host | Reading via Edge Agent is enough first | Write-back into on-prem systems required by ≥ 2 hubs |
+| Verification fuzz tests for generated APIs | Depends on API generation | When API generation is scheduled |
+
+## 9. Cross-phase workstreams
 
 | Workstream | Activities | Owner |
 |---|---|---|
@@ -554,7 +585,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | **Docs** | ADRs, runbooks, API docs, spoke-facing help (AR/EN) | All |
 | **Cost** | Infra and LLM cost per spoke reviewed monthly | SRE, AI |
 
-## 9. Key dependencies and risks to the schedule
+## 10. Key dependencies and risks to the schedule
 
 | Dependency / risk | Affects | Mitigation |
 |---|---|---|
@@ -565,7 +596,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | Hiring ramp | All | Start hiring for Phase 2 roles in Phase 1 |
 | Building everything in-house | Scope creep | Phase gates; cut non-P0 items before slipping exit dates |
 
-## 10. Phase gate checklist (used at every phase exit)
+## 11. Phase gate checklist (used at every phase exit)
 
 - [ ] Exit criteria met with evidence (dashboards, reports)
 - [ ] No open P0/P1 bugs; no high/critical security findings

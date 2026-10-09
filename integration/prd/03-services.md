@@ -42,7 +42,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 - **Data:** Redis (agent → pod routing), Postgres (agent registry, versions).
 - **Depends on:** KMS (CA), Connection.
 - **Scale & SLO:** sticky connections, horizontal by agent count (target 2,000 agents/pod); 99.95%.
-- **Phase:** 1.
+- **Phase:** 2.
 
 ---
 
@@ -146,7 +146,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 - **Events:** pub `discovery.started/tier_selected/completed/failed/upgrade_available`; sub `connection.created`, `cm.diff_detected`, connector error signals.
 - **Data:** discovery_runs, tier_decisions, worker_results (refs).
 - **Depends on:** ingestion workers S14–S19, S21, CM Registry, Mapping.
-- **Phase:** 1 (T1, T3, T6, T7), 2 (all tiers, upgrades).
+- **Phase:** 1 (T1, T6, T7, T8b), 2 (T3, T5, T8a, upgrades).
 
 ### S14 — Spec Ingestor (T1)
 - **Purpose:** ingest machine-readable API descriptions.
@@ -160,26 +160,29 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 - **Responsibilities:** crawl portal URLs (headless browser), parse PDF/HTML; extract endpoints, params, schemas, auth; generate draft OpenAPI with confidence per item; probe endpoints with test credentials (read-only, safe methods) to confirm.
 - **API:** internal `POST /internal/ingest/docs`.
 - **Depends on:** Agent Runtime, LLM Gateway, Connector Runtime (probes).
-- **Phase:** 2.
+- **Phase:** Deferred (delivery plan §8).
 
 ### S16 — DB Introspector (T3)
 - **Purpose:** describe databases reachable through the Edge Agent.
 - **Responsibilities:** schema introspection (tables, columns, types, PK/FK, indexes, enums, views); row samples (limited, masked); entity inference (which tables are customers, invoices, …) using names, keys, samples; PII detection; change-tracking options (CDC availability, timestamp columns); generate read operations (queries) as CM operations.
 - **API:** internal `POST /internal/ingest/db`.
 - **Depends on:** Tunnel Gateway, Agent Runtime.
-- **Phase:** 1.
+- **Phase:** 2.
 
 ### S17 — Code Analyzer (T4)
 - **Purpose:** find business operations in a codebase.
 - **Responsibilities:** clone read-only (or receive archive from Edge Agent); parse with language parsers (PHP/Laravel, C#/.NET, JS/TS-Node first); extract routes, controllers, services, ORM models, DB writes; agent identifies business operations and side effects; output CM operations (internal) and input to API Generator.
 - **API:** internal `POST /internal/ingest/code`.
 - **Depends on:** Code Sandbox, Agent Runtime.
-- **Phase:** 2.
+- **Phase:** Deferred (delivery plan §8).
 
-### S18 — Traffic Analyzer (T5)
-- **Purpose:** derive an internal API from recorded web-app usage (with consent).
-- **Responsibilities:** browser helper records a guided session (HAR + cookies), with PII redaction; identify request chains, auth/session handling, CSRF tokens; generate a client (operations) and CM; replay tests; fragility monitoring.
-- **API:** internal `POST /internal/ingest/traffic`.
+### S18 — Website-to-API (T5)
+- **Purpose:** turn any website a merchant uses (cloud ERP, portal) into an API, with the merchant's consent.
+- **Responsibilities:** browser helper records a guided session (HAR + cookies) with PII redaction; analysis of request chains, auth/session handling and CSRF, preferring internal network calls over screen clicks; **site profiles**: one reusable profile per website/platform shared by all merchants on it; isolated headless browser runner for flows that need screen automation; **session vault** (credentials in KMS, session refresh, OTP/captcha requested from the merchant via WhatsApp); **self-healing**: synthetic checks per profile, change detection, agent re-derives the profile, review before rollout; read-only first; per-site legal/ToS checklist before enabling.
+- **API:** internal `POST /internal/web/profiles`, `POST /internal/web/sessions`, `POST /internal/web/execute`; Studio `/v1/studio/site-profiles`.
+- **Events:** pub `web.profile_broken`, `web.profile_healed`, `web.otp_requested`.
+- **Data:** site profiles (versioned), sessions (encrypted refs), check results.
+- **Depends on:** KMS, Human Task Service (OTP via WhatsApp), Code Sandbox (runner isolation), Agent Runtime, Connector Runtime.
 - **Phase:** 2.
 
 ### S19 — Document Extractor (T7)
@@ -198,24 +201,24 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 - **Scale & SLO:** stateless; overhead p95 < 30 ms.
 - **Phase:** 1.
 
-### S21 — Country Connectors (T6)
-- **Purpose:** shared external sources per country.
-- **Responsibilities:** **Egypt ETA**: e-invoice and e-receipt APIs (authentication with taxpayer client credentials, document search, document details, submission status), mapping templates to the embedded-finance canonical model; **KSA ZATCA** (Phase 3); bank statement ingestion (MT940/CAMT/CSV) and open-banking providers when available; marketplace connectors (P2).
+### S21 — Shared-source Connectors (T6)
+- **Purpose:** data about merchants held outside the merchant: tax portals, banks, the hub itself.
+- **Responsibilities:** **Egypt ETA**: e-invoice and e-receipt APIs (authentication with taxpayer client credentials, document search, document details, submission status), mapping templates to the embedded-finance canonical model; **KSA ZATCA** (Phase 3); bank statement ingestion (MT940/CAMT/CSV/Excel) and open-banking providers when available; **hub-data connector** for the fintech's own records per merchant (transactions, collections); marketplace connectors (P2).
 - **API:** registered as connectors in Connector Runtime + CM templates.
-- **Phase:** 1 (ETA), 3 (ZATCA, bank statements), 5 (marketplaces).
+- **Phase:** 1 (ETA, bank statements, hub data), 3 (ZATCA), 5 (marketplaces).
 
 ### S22 — Edge Agent
 - **Purpose:** secure presence inside customer networks.
 - **Responsibilities:** see architecture §6: enrollment, tunnel, signed commands, local policy, DB drivers, CDC, file watcher, generated-API host, buffer/outbox, local audit, auto-update, local status UI (`localhost` page), diagnostics bundle.
 - **Platforms:** Windows Server 2012 R2+ (service), Linux x64/arm64 (systemd), Docker image.
-- **Phase:** 1 (tunnel, SQL Server/MySQL/PostgreSQL read, buffer, update), 2 (CDC, hosted APIs, Oracle, files).
+- **Phase:** 2 (tunnel, SQL Server/MySQL/PostgreSQL read, buffer, update, then CDC, Oracle, files). Hosted APIs deferred.
 
 ### S23 — API Generator (S2)
 - **Purpose:** create an API where none exists.
 - **Responsibilities:** from DB CM: generate curated read endpoints + specific write endpoints (stored procedure or table writes with validation) as an Edge-hosted plugin; from code CM: generate a thin API layer in the customer's stack calling their functions, delivered as PR or Edge plugin; generate OpenAPI + tests; run tests in Sandbox against a cloned/staging DB; publish result back as T1 capability.
 - **API:** internal `POST /internal/apigen/jobs`, `GET /internal/apigen/jobs/{id}`.
 - **Depends on:** Code Sandbox, Agent Runtime, Verification, Tunnel Gateway.
-- **Phase:** 2.
+- **Phase:** Deferred (delivery plan §8).
 
 ---
 
@@ -346,9 +349,9 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S39 — Micro-app Platform (T8b)
 - **Purpose:** minimal systems for parties without one.
-- **Responsibilities:** app generator from selected canonical entities (lists, forms, detail views, status boards, import/export, simple roles); per-app schema storage; mobile-first PWA; Arabic/English; app data automatically exposed as T1 capabilities (CM generated); upgrades when the canonical model changes.
+- **Responsibilities:** narrow app generator for the hub's flow from selected canonical entities (lists, forms, detail views, status boards, simple roles); starts from the merchant's uploaded Excel; WhatsApp links and notifications; receives hub write-back (payment status, settlements); per-app schema storage; mobile-first PWA; Arabic/English; app data automatically exposed as T1 capabilities (CM generated); upgrades when the canonical model changes.
 - **API:** `/v1/microapps`, `/v1/microapps/{id}/data/*`, app runtime at `{spoke}.apps.wasla...`.
-- **Phase:** 4.
+- **Phase:** 1 (pilot: one narrow app), 2 (expansion if ≥ 40% of pilot merchants active after 60 days).
 
 ---
 

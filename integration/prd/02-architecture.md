@@ -162,7 +162,7 @@ Full specification of each service in [03-services.md](03-services.md).
 |---|---|---|---|---|---|
 | S01 | API Gateway | Edge | Go | Redis | 0 |
 | S02 | Webhook Ingress | Edge | Go | Event bus, object store | 1 |
-| S03 | Tunnel Gateway | Edge | Go | Redis | 1 |
+| S03 | Tunnel Gateway | Edge | Go | Redis | 2 |
 | S04 | Identity & Access (IAM) | Platform | TS | Postgres | 0 |
 | S05 | Tenant & Party | Platform | TS | Postgres | 0 |
 | S06 | Consent | Platform | TS | Postgres | 1 |
@@ -174,15 +174,15 @@ Full specification of each service in [03-services.md](03-services.md).
 | S12 | Connection Service | Connectivity | TS | Postgres | 1 |
 | S13 | Discovery Orchestrator | Connectivity | TS | Postgres + workflows | 1 |
 | S14 | Spec Ingestor (T1) | Connectivity | TS | Object store | 1 |
-| S15 | Doc Reader (T2) | Connectivity | Python | Object store | 2 |
-| S16 | DB Introspector (T3) | Connectivity | Python | Object store | 1 |
-| S17 | Code Analyzer (T4) | Connectivity | Python | Object store | 2 |
-| S18 | Traffic Analyzer (T5) | Connectivity | Python | Object store | 2 |
+| S15 | Doc Reader (T2) | Connectivity | Python | Object store | Deferred |
+| S16 | DB Introspector (T3) | Connectivity | Python | Object store | 2 |
+| S17 | Code Analyzer (T4) | Connectivity | Python | Object store | Deferred |
+| S18 | Website-to-API (T5) | Connectivity | Python + Go | Object store, Postgres | 2 |
 | S19 | Document Extractor (T7) | Connectivity | Python | Object store | 1 |
 | S20 | Connector Runtime | Connectivity | TS | Redis | 1 |
-| S21 | Country Connectors (T6) | Connectivity | TS | Postgres | 1 (ETA) / 3 (ZATCA) |
-| S22 | Edge Agent | Connectivity | Go | Local SQLite buffer | 1 |
-| S23 | API Generator (S2) | Connectivity | Python + TS | Object store, Git | 2 |
+| S21 | Shared-source Connectors (T6) | Connectivity | TS | Postgres | 1 (ETA, bank, hub data) / 3 (ZATCA) |
+| S22 | Edge Agent | Connectivity | Go | Local SQLite buffer | 2 |
+| S23 | API Generator (S2) | Connectivity | Python + TS | Object store, Git | Deferred |
 | S24 | Capability Model Registry | Canonical data | TS | Postgres (JSONB) | 1 |
 | S25 | Canonical Model Registry | Canonical data | TS | Postgres + Git | 0 |
 | S26 | Mapping Service | Canonical data | Python | Postgres + vectors | 1 |
@@ -198,7 +198,7 @@ Full specification of each service in [03-services.md](03-services.md).
 | S36 | Reconciler | Agreement | TS | Postgres | 1 |
 | S37 | Breaks & Cases | Agreement | TS | Postgres | 1 |
 | S38 | Human Task Service | Human | TS | Postgres | 2 |
-| S39 | Micro-app Platform | Human | TS | Postgres (per-app schema) | 4 |
+| S39 | Micro-app Platform | Human | TS | Postgres (per-app schema) | 1 (pilot) / 2 (expansion) |
 | S40 | LLM Gateway + PII Guard | AI | Python | Redis, Postgres | 0 |
 | S41 | Agent Runtime + Prompt Registry | AI | Python | Postgres | 0 |
 | S42 | Evaluation Service | AI | Python | Postgres + object store | 1 |
@@ -536,7 +536,7 @@ wasla/
 │  ├─ iam/  tenant/  consent/  region/  notification/  billing/  search/   (TS)
 │  ├─ kms/  audit/  state-ledger/  money-ledger/  sandbox/   (Go)
 │  ├─ connection/  discovery/  connector-runtime/  country-connectors/     (TS)
-│  ├─ ingest-spec/ (TS)  ingest-docs/ ingest-db/ ingest-code/ ingest-traffic/ ingest-documents/ (Py)
+│  ├─ ingest-spec/ (TS)  ingest-db/ website-to-api/ ingest-documents/ (Py)  · deferred: ingest-docs/ ingest-code/
 │  ├─ api-generator/  (Py+TS)
 │  ├─ cm-registry/  cdm-registry/  canonical-data/          (TS)
 │  ├─ mapping/  designer-agent/  ops-agent/  llm-gateway/  agent-runtime/  evaluation/ (Py)
