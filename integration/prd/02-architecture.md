@@ -460,18 +460,18 @@ sequenceDiagram
 `dev` (shared, ephemeral PR environments) → `staging` (prod-like, synthetic tenants) → `sandbox` (customer-facing sandbox, per region) → `production`.
 
 ### 9.3 Kubernetes layout
-| Namespace | Contents |
+The backend is a modular monolith shipped as a few deployables (ADR-012; details in [05-tech-stack.md](05-tech-stack.md) §2).
+
+| Namespace | Deployables |
 |---|---|
-| `edge` | API Gateway, Webhook Ingress, Tunnel Gateway |
-| `platform` | IAM, Tenant, Consent, KMS, Region, Audit, Notification, Billing, Search |
-| `connectivity` | Connection, Discovery, ingestion workers, Connector Runtime, Country Connectors, API Generator |
-| `canonical` | CM Registry, Canonical Model Registry, Mapping, CDS |
-| `integration` | Spec Service, Compiler, Orchestration workers, Run History, Verification |
-| `agreement` | State Ledger, Money Ledger, Reconciler, Breaks |
-| `human` | Human Tasks, Micro-app Platform |
-| `ai` | LLM Gateway, Agent Runtime, Evaluation, Sandbox (isolated node pool), Ops Agent |
-| `ux` | Hub API, Console BFF, Connect Service, Developer Portal |
-| `infra` | Temporal, NATS JetStream, cache, observability |
+| `edge` | edge (gateway, ingress; tunnel from Phase 2) |
+| `core` | core (`api`, `worker`, `relay`, `cron`) |
+| `security` | kms (strict network policy) |
+| `ledger` | ledger (audit, state ledger, money ledger) |
+| `ai` | ai (`api`, `worker`, `embeddings`) |
+| `sandbox` | sandbox on an isolated node pool (Phase 2) |
+| `web` | console, connect, dev-portal |
+| `infra` | PostgreSQL, Temporal, NATS JetStream, Valkey, object storage, observability |
 
 ### 9.4 Delivery
 Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (desired state repo per environment) → progressive delivery (canary 5% → 25% → 100% with SLO-based automatic rollback). Database migrations: expand/contract, backward compatible for one release.
@@ -509,56 +509,29 @@ Monorepo → CI (lint, test, build, scan, SBOM) → images signed → GitOps (de
 
 ## 12. Technology stack
 
+Full detail in **[05-tech-stack.md](05-tech-stack.md)**. Summary:
+
 | Concern | Choice |
 |---|---|
-| Core services | TypeScript (Node.js LTS), framework: Fastify + internal service kit |
-| Agent & analysis services | Python 3.12, FastAPI + internal agent kit |
-| Performance/edge services | Go (Gateway, Tunnel, KMS, Ledgers, Edge Agent, Sandbox, Audit) |
-| Frontend | React + TypeScript, internal design system, i18n with RTL |
-| Workflows | Temporal (TS and Python SDKs), wrapped by internal `durable` library |
-| Database | PostgreSQL 16+ with partitioning, RLS, vector column type |
-| Events | NATS JetStream (Postgres outbox → relay → JetStream; durable pull consumers) (ADR-011) |
-| Cache | Redis-compatible |
+| Shape | Modular monolith: 7 backend deployables (edge, core, kms, ledger, ai, sandbox, edge-agent) |
+| Core product | TypeScript (Node.js LTS), Fastify, Zod, Kysely |
+| AI & extraction | Python, FastAPI, Pydantic, Anthropic SDK, own Agent Runtime (no LangChain/LangGraph) |
+| Edge, security, ledgers | Go, chi, pgx |
+| Front-end | React, Vite, TanStack, own design system, Arabic/English RTL |
+| Workflows | Temporal (self-hosted, Postgres persistence) |
+| Database | PostgreSQL with RLS, partitioning, pgvector, PgBouncer |
+| Events | NATS JetStream with Postgres outbox + relay (ADR-011) |
+| Cache | Valkey |
 | Object store | S3-compatible |
-| Infra | Kubernetes, Helm charts, GitOps controller, IaC |
-| Canonical model | JSON Schema per entity + state machine definitions |
-| Mapping/conversion | Internal expression language (JSONata-compatible syntax) |
-| API contracts | OpenAPI 3.1 for REST, AsyncAPI for events, JSON Schema for payloads |
+| Infra | Kubernetes, Helm, Argo CD, OpenTofu |
+| Observability | OpenTelemetry, VictoriaMetrics, Loki, Tempo, Grafana |
+| Contracts | OpenAPI 3.1, AsyncAPI 3.0, JSON Schema 2020-12 |
 
 ---
 
 ## 13. Repository and code organization
 
-```
-wasla/
-├─ apps/                      # deployable services and UIs
-│  ├─ gateway/  tunnel-gateway/  webhook-ingress/            (Go)
-│  ├─ iam/  tenant/  consent/  region/  notification/  billing/  search/   (TS)
-│  ├─ kms/  audit/  state-ledger/  money-ledger/  sandbox/   (Go)
-│  ├─ connection/  discovery/  connector-runtime/  country-connectors/     (TS)
-│  ├─ ingest-spec/ (TS)  ingest-db/ website-to-api/ ingest-documents/ (Py)  · deferred: ingest-docs/ ingest-code/
-│  ├─ api-generator/  (Py+TS)
-│  ├─ cm-registry/  cdm-registry/  canonical-data/          (TS)
-│  ├─ mapping/  designer-agent/  ops-agent/  llm-gateway/  agent-runtime/  evaluation/ (Py)
-│  ├─ spec-service/  spec-compiler/  orchestration/  run-history/  verification/ (TS)
-│  ├─ reconciler/  breaks/  human-tasks/  microapps/        (TS)
-│  ├─ hub-api/  console-bff/  connect-service/              (TS)
-│  ├─ web-hub-console/  web-spoke-portal/  web-studio/  web-connect/  web-dev-portal/ (React)
-│  └─ edge-agent/                                           (Go)
-├─ packages/                  # shared libraries
-│  ├─ service-kit-ts/  service-kit-py/  service-kit-go/     # auth, tenancy, logging, tracing, outbox/inbox
-│  ├─ contracts/              # OpenAPI, AsyncAPI, JSON Schemas, generated clients
-│  ├─ durable/                # workflow wrappers, activity helpers
-│  ├─ expr/                   # conversion expression language
-│  ├─ policy/                 # authz library
-│  ├─ design-system/  i18n/
-│  └─ sdk-ts/  sdk-py/
-├─ canonical-models/          # embedded-finance/, retail/ ... (JSON Schema)
-├─ country-packs/             # eg/, sa/
-├─ infra/                     # IaC, Helm charts, GitOps env repos
-├─ evals/                     # golden datasets, eval configs
-└─ docs/                      # ADRs, runbooks, API docs
-```
+See [05-tech-stack.md](05-tech-stack.md) §13: `apps/` (deployables), `modules/` (one folder per service id, grouped by language), `packages/` (shared libraries), plus `canonical-models/`, `country-packs/`, `evals/`, `infra/`, `docs/`.
 
 ---
 
@@ -587,4 +560,7 @@ wasla/
 | ADR-008 | Edge Agent in Go, outbound-only, signed commands |
 | ADR-009 | All agents behind LLM Gateway with mandatory PII Guard |
 | ADR-010 | Monorepo with shared service kits per language |
+| ADR-012 | Modular monolith: module boundaries = services in 03-services.md; shipped as 7 deployables; boundaries enforced by lint; modules extractable later |
+| ADR-013 | TypeScript, Python and Go from day one (TS core product, Python AI/extraction, Go edge/security/ledgers) |
+| ADR-014 | No agent frameworks: Anthropic SDK + own Agent Runtime + Temporal |
 | ADR-011 | NATS JetStream is the event backbone from day one (not Kafka): light to operate, request/reply, accounts for tenant isolation, replay, and leaf nodes for edge connectivity. Postgres outbox + relay keeps publishing atomic with data changes; consumers are idempotent. Durable multi-step processing stays in Temporal. All producers/consumers use the `events` interface in the service kits |

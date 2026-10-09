@@ -85,7 +85,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 ### E0.2 Engineering foundations
 | ID | Task | Svc | Role | pw | Dep |
 |---|---|---|---|---|---|
-| T0.2.1 | Monorepo setup (layout per architecture §13), build tooling for TS/Py/Go, code owners | — | TL | 1 | — |
+| T0.2.1 | Monorepo setup (modular-monolith layout per tech stack §13; module boundary lint), build tooling for TS/Py/Go, code owners | — | TL | 1 | — |
 | T0.2.2 | CI pipeline: lint, test, build, SAST, dependency scan, SBOM, image signing | — | SRE | 1.5 | T0.2.1 |
 | T0.2.3 | Service kit TS: config, logging, tracing, metrics, health, auth middleware, tenant context, errors (RFC 9457) | — | BE | 2 | T0.2.1 |
 | T0.2.4 | Service kit Python (same features) | — | AI | 1.5 | T0.2.1 |
