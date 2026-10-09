@@ -26,7 +26,7 @@ Format per service: **Purpose · Responsibilities · API · Events (pub / sub) �
 
 ### S02 — Webhook Ingress
 - **Purpose:** receive webhooks from spoke systems and external providers durably.
-- **Responsibilities:** unique endpoint per connection (`/in/{connection_token}`); signature verification per provider; persist raw payload to object store + event log before 2xx; dedup by provider event id; payload size and rate limits.
+- **Responsibilities:** unique endpoint per connection (`/in/{connection_token}`); signature verification per provider; persist raw payload to object store + Postgres event store before 2xx; dedup by provider event id; payload size and rate limits.
 - **API:** `POST /in/{token}`; internal `GET /internal/webhooks/{id}`.
 - **Events:** pub `webhook.received`.
 - **Data:** object store (raw payloads, encrypted); small Postgres table for endpoint registry.

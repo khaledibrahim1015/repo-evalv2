@@ -18,7 +18,7 @@ It is sold to **hubs**, companies that must integrate with many counterparties (
 3. **Runs** integrations durably (retries, queues, idempotency, monitoring) on behalf of companies whose own infrastructure is weak.
 4. **Proves** that both parties agree, by tracking every shared object in a **State Ledger** and **reconciling** both sides continuously.
 
-**Build policy:** every product component is built in-house. Commodity infrastructure (database engine, message broker, container orchestration, durable-workflow engine) is used as infrastructure, not as product. Licensing is out of scope for this document.
+**Build policy:** every product component is built in-house. Commodity infrastructure (database engine, container orchestration, durable-workflow engine; a message broker only when scale requires it) is used as infrastructure, not as product. Licensing is out of scope for this document.
 
 ---
 

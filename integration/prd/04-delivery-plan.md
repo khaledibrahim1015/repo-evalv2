@@ -90,7 +90,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T0.2.3 | Service kit TS: config, logging, tracing, metrics, health, auth middleware, tenant context, errors (RFC 9457) | — | BE | 2 | T0.2.1 |
 | T0.2.4 | Service kit Python (same features) | — | AI | 1.5 | T0.2.1 |
 | T0.2.5 | Service kit Go (same features) | — | GO | 1.5 | T0.2.1 |
-| T0.2.6 | Outbox/inbox libraries (TS, Py, Go) + event envelope schema | — | BE, GO | 2 | T0.2.3 |
+| T0.2.6 | Event store + outbox/inbox libraries (TS, Py, Go): `events` table, cursors, `LISTEN/NOTIFY`, event envelope schema, broker-ready interface (ADR-011) | — | BE, GO | 2 | T0.2.3 |
 | T0.2.7 | Contracts package: OpenAPI/AsyncAPI layout, client generation | — | BE | 1 | T0.2.1 |
 | T0.2.8 | `durable` library: Temporal wrappers, activity conventions, retry presets | — | BE | 1.5 | T0.3.4 |
 | T0.2.9 | Policy (authz) library: RBAC + tenant + scope checks, deny-by-default | — | TL | 1.5 | T0.2.3 |
@@ -103,7 +103,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 | T0.3.1 | Select Egypt hosting provider meeting residency; contract | — | SRE, PM | 1 | T0.1.6 |
 | T0.3.2 | IaC: network, Kubernetes cluster, node pools, storage classes | — | SRE | 2 | T0.3.1 |
 | T0.3.3 | PostgreSQL HA with PITR, per-service schemas, RLS conventions | — | SRE | 1 | T0.3.2 |
-| T0.3.4 | Temporal cluster, event log, cache, object storage | — | SRE | 1.5 | T0.3.2 |
+| T0.3.4 | Temporal cluster (Postgres persistence), cache, object storage | — | SRE | 1.5 | T0.3.2 |
 | T0.3.5 | GitOps repos per environment; progressive delivery controller | — | SRE | 1 | T0.3.2 |
 | T0.3.6 | Observability platform: collectors, metrics/logs/traces stores, dashboards, alerting (S50) | S50 | SRE | 2 | T0.3.2 |
 | T0.3.7 | Secrets bootstrap: root key provider for KMS | S07 | SRE | 0.5 | T0.3.2 |
@@ -474,7 +474,7 @@ Code reviewed and merged · unit + integration tests · contracts updated (OpenA
 |---|---|---|---|---|---|
 | T3.5.1 | Mapping improvements (active learning, template coverage); target ≥ 80% auto | S26 | AI | 3 | — |
 | T3.5.2 | CDS: automatic fallback ordering from observed latency/failures per connection | S27 | BE | 1 | — |
-| T3.5.3 | Chaos game days (tunnel loss, DB failover, broker loss) | — | SRE | 1 | — |
+| T3.5.3 | Chaos game days (tunnel loss, DB failover, Temporal loss) | — | SRE | 1 | — |
 | T3.5.4 | Load test to 20M runs/month, 2,000 agents | — | SRE, QA | 2 | — |
 | T3.5.5 | Hubs #4–#6 onboarding; scale to 1,000 spokes | — | IE, PM | 6 | — |
 
